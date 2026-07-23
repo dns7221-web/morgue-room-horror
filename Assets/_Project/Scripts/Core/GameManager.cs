@@ -40,6 +40,8 @@ public class GameManager : MonoBehaviour
     private bool judged;   // 이번 방을 이미 판정했는지 (중복 방지)
 
     public int Progress => progress;
+    /// <summary>클리어에 필요한 연속 성공 횟수 (진행도 UI가 "n / 목표" 표시에 사용).</summary>
+    public int ClearGoal => clearGoal;
     public bool IsCleared => progress >= clearGoal;
     /// <summary>이번 방을 이미 판정했는지 (키패드가 중복 판정을 막는 데 사용).</summary>
     public bool HasJudged => judged;
