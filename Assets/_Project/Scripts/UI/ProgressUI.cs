@@ -18,8 +18,10 @@ public class ProgressUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI label;
 
     [Header("Format")]
-    [Tooltip("진행도 표시 형식. {0}=현재 진행도, {1}=목표 횟수.")]
+    [Tooltip("진행도 표시 형식. {0}=현재 값(진행도+시작 번호), {1}=목표 횟수.")]
     [SerializeField] private string format = "{0} / {1}";
+    [Tooltip("표시 시작 번호. 0이면 0/8부터, 1이면 1/8부터 시작.")]
+    [SerializeField] private int displayOffset = 1;
     [Tooltip("클리어 시 표시할 문구.")]
     [SerializeField] private string clearedText = "CLEAR";
 
@@ -34,8 +36,11 @@ public class ProgressUI : MonoBehaviour
         if (label == null || GameManager.Instance == null) return;
 
         var gm = GameManager.Instance;
+        // 진행도(0부터)에 시작 번호를 더해 '현재 값'을 만든다.
+        // displayOffset=1이면 시작 0 → "1 / 8", 7성공 → "8 / 8", 클리어 시 clearedText.
+        int current = gm.Progress + displayOffset;
         label.text = gm.IsCleared
             ? clearedText
-            : string.Format(format, gm.Progress, gm.ClearGoal);
+            : string.Format(format, current, gm.ClearGoal);
     }
 }
