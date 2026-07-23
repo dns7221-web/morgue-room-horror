@@ -1,71 +1,160 @@
 fileFormatVersion: 2
 guid: d5bfb36852010524c829d0b80d76d3dc
-timeCreated: 1537866504
-licenseType: Free
 ModelImporter:
-  serializedVersion: 21
-  fileIDToRecycleName:
-    100000: Bone003
-    100002: Bone004
-    100004: Bone005
-    100006: BoneArm
-    100008: BoneHand
-    100010: BoneIndexBase
-    100012: BoneIndexEnd
-    100014: BoneIndexMid
-    100016: BoneMiddleBase
-    100018: BoneMiddleBaseEnd
-    100020: BoneMiddleMid
-    100022: BonePinkyBase
-    100024: BonePinkyEnd
-    100026: BonePinkyMid
-    100028: BoneRingBase
-    100030: BoneRingEnd
-    100032: BoneRingMiddle
-    100034: BoneWristRoll
-    100036: //RootNode
-    100038: Gloves_SciFi-NoKnuckles
-    400000: Bone003
-    400002: Bone004
-    400004: Bone005
-    400006: BoneArm
-    400008: BoneHand
-    400010: BoneIndexBase
-    400012: BoneIndexEnd
-    400014: BoneIndexMid
-    400016: BoneMiddleBase
-    400018: BoneMiddleBaseEnd
-    400020: BoneMiddleMid
-    400022: BonePinkyBase
-    400024: BonePinkyEnd
-    400026: BonePinkyMid
-    400028: BoneRingBase
-    400030: BoneRingEnd
-    400032: BoneRingMiddle
-    400034: BoneWristRoll
-    400036: //RootNode
-    400038: Gloves_SciFi-NoKnuckles
-    4300000: Gloves_SciFi-NoKnuckles
-    7400000: Take 001
-    9500000: //RootNode
-    13700000: Gloves_SciFi-NoKnuckles
+  serializedVersion: 24200
+  internalIDToNameTable:
+  - first:
+      1: 100000
+    second: Bone003
+  - first:
+      1: 100002
+    second: Bone004
+  - first:
+      1: 100004
+    second: Bone005
+  - first:
+      1: 100006
+    second: BoneArm
+  - first:
+      1: 100008
+    second: BoneHand
+  - first:
+      1: 100010
+    second: BoneIndexBase
+  - first:
+      1: 100012
+    second: BoneIndexEnd
+  - first:
+      1: 100014
+    second: BoneIndexMid
+  - first:
+      1: 100016
+    second: BoneMiddleBase
+  - first:
+      1: 100018
+    second: BoneMiddleBaseEnd
+  - first:
+      1: 100020
+    second: BoneMiddleMid
+  - first:
+      1: 100022
+    second: BonePinkyBase
+  - first:
+      1: 100024
+    second: BonePinkyEnd
+  - first:
+      1: 100026
+    second: BonePinkyMid
+  - first:
+      1: 100028
+    second: BoneRingBase
+  - first:
+      1: 100030
+    second: BoneRingEnd
+  - first:
+      1: 100032
+    second: BoneRingMiddle
+  - first:
+      1: 100034
+    second: BoneWristRoll
+  - first:
+      1: 100036
+    second: //RootNode
+  - first:
+      1: 100038
+    second: Gloves_SciFi-NoKnuckles
+  - first:
+      4: 400000
+    second: Bone003
+  - first:
+      4: 400002
+    second: Bone004
+  - first:
+      4: 400004
+    second: Bone005
+  - first:
+      4: 400006
+    second: BoneArm
+  - first:
+      4: 400008
+    second: BoneHand
+  - first:
+      4: 400010
+    second: BoneIndexBase
+  - first:
+      4: 400012
+    second: BoneIndexEnd
+  - first:
+      4: 400014
+    second: BoneIndexMid
+  - first:
+      4: 400016
+    second: BoneMiddleBase
+  - first:
+      4: 400018
+    second: BoneMiddleBaseEnd
+  - first:
+      4: 400020
+    second: BoneMiddleMid
+  - first:
+      4: 400022
+    second: BonePinkyBase
+  - first:
+      4: 400024
+    second: BonePinkyEnd
+  - first:
+      4: 400026
+    second: BonePinkyMid
+  - first:
+      4: 400028
+    second: BoneRingBase
+  - first:
+      4: 400030
+    second: BoneRingEnd
+  - first:
+      4: 400032
+    second: BoneRingMiddle
+  - first:
+      4: 400034
+    second: BoneWristRoll
+  - first:
+      4: 400036
+    second: //RootNode
+  - first:
+      4: 400038
+    second: Gloves_SciFi-NoKnuckles
+  - first:
+      43: 4300000
+    second: Gloves_SciFi-NoKnuckles
+  - first:
+      74: 7400000
+    second: Take 001
+  - first:
+      95: 9500000
+    second: //RootNode
+  - first:
+      137: 13700000
+    second: Gloves_SciFi-NoKnuckles
+  externalObjects: {}
   materials:
-    importMaterials: 0
+    materialImportMode: 0
     materialName: 0
     materialSearch: 1
+    materialLocation: 0
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
     resampleCurves: 1
     optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
     motionNodeName: 
-    rigImportErrors: 
-    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
-    animationCompression: 1
+    importAnimatedCustomProperties: 0
+    importConstraints: 0
+    animationCompression: 3
     animationRotationError: 0.5
     animationPositionError: 0.5
     animationScaleError: 0.5
@@ -79,30 +168,52 @@ ModelImporter:
     globalScale: 1
     meshCompression: 0
     addColliders: 0
+    useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 0
     importVisibility: 1
     importBlendShapes: 1
     importCameras: 1
     importLights: 1
+    nodeNameCollisionStrategy: 0
+    fileIdsGeneration: 1
     swapUVChannels: 0
     generateSecondaryUV: 0
     useFileUnits: 1
-    optimizeMeshForGPU: 1
     keepQuads: 0
     weldVertices: 1
+    bakeAxisConversion: 0
+    preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    meshOptimizationFlags: -1
+    indexFormat: 1
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001
     secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 0
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
     secondaryUVPackMargin: 4
     useFileScale: 1
+    strictVertexDataChecks: 0
   tangentSpace:
     normalSmoothAngle: 60
     normalImportMode: 0
     tangentImportMode: 3
     normalCalculationMode: 4
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 1
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  referencedClips: []
   importAnimation: 1
-  copyAvatar: 0
   humanDescription:
-    serializedVersion: 2
+    serializedVersion: 3
     human: []
     skeleton: []
     armTwist: 0.5
@@ -112,14 +223,19 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
+    globalScale: 1
     rootMotionBoneName: 
-    rootMotionBoneRotation: {x: 0, y: 0, z: 0, w: 1}
     hasTranslationDoF: 0
-    hasExtraRoot: 0
-    skeletonHasParents: 1
-  lastHumanDescriptionAvatarSource: {instanceID: 0}
+    hasExtraRoot: 1
+    skeletonHasParents: 0
+  lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: 7365d78afce90da40addd9b7c10a02f7, type: 3}
+  autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 2
   humanoidOversampling: 1
+  avatarSetup: 2
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 0
+  importBlendShapeDeformPercent: 0
+  remapMaterialsIfMaterialImportModeIsNone: 1
   additionalBone: 0
   userData: 
   assetBundleName: 
