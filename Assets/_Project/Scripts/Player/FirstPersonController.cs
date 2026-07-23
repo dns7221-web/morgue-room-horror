@@ -63,6 +63,12 @@ public class FirstPersonController : MonoBehaviour
     public bool IsMoving { get; private set; }
 
     /// <summary>
+    /// true면 시점·이동 조작을 잠근다 (UI가 열려 마우스를 써야 할 때).
+    /// 판정 UI(JudgmentUI)가 열릴 때 켜고, 닫힐 때 끈다.
+    /// </summary>
+    public bool ControlsLocked { get; set; }
+
+    /// <summary>
     /// 컴포넌트 캐싱과 입력 액션 정의를 담당한다.
     /// Move는 WASD → Vector2 합성(2DVector), Look은 마우스 델타에 바인딩한다.
     /// 입력을 여기서 코드로 만들기 때문에 인스펙터/에셋 세팅이 필요 없다.
@@ -114,6 +120,13 @@ public class FirstPersonController : MonoBehaviour
     /// </summary>
     private void Update()
     {
+        // UI가 열려 있는 동안은 시점·이동을 멈춘다 (마우스를 UI에 양보).
+        if (ControlsLocked)
+        {
+            IsMoving = false;   // 손 애니메이션도 Idle로
+            return;
+        }
+
         HandleLook();
         HandleMovement();
     }
