@@ -46,6 +46,14 @@ public class PlayerInteractor : MonoBehaviour
 
     private void Update()
     {
+        // 판정 UI가 열려 있는 동안엔 상호작용을 멈춘다 (커서가 풀린 UI 모드에서
+        // 카메라가 문을 조준한 채 E로 문이 여닫히는 것을 방지).
+        if (JudgmentUI.Instance != null && JudgmentUI.Instance.IsOpen)
+        {
+            current = null;
+            return;
+        }
+
         // 매 프레임 조준 대상 갱신.
         current = FindInteractable();
 
@@ -58,7 +66,11 @@ public class PlayerInteractor : MonoBehaviour
     private IInteractable FindInteractable()
     {
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-        if (Physics.Raycast(ray, out RaycastHit hit, interactRange, interactableLayer))
+        // QueryTriggerInteraction.Collide: 키패드의 상호작용 콜라이더가 트리거(IsTrigger)라서
+        // 프로젝트 전역 설정(queriesHitTriggers)과 무관하게 트리거도 반드시 조준되게 한다.
+        // 복도 순간이동 트리거처럼 조준되면 안 되는 볼륨은 interactableLayer(Interactable)
+        // 밖의 레이어에 두어 LayerMask 단계에서 걸러낸다.
+        if (Physics.Raycast(ray, out RaycastHit hit, interactRange, interactableLayer, QueryTriggerInteraction.Collide))
         {
             // 콜라이더가 자식(문짝)에 있고 Door는 부모에 있을 수 있으므로 InParent로 탐색.
             return hit.collider.GetComponentInParent<IInteractable>();
