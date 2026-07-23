@@ -158,4 +158,145 @@
 
 ---
 
+## 🧑‍💻 구현 상세 — 무슨 기능을, 어떤 함수로 만들었나
+
+> 이 섹션은 **"코드로 무엇을 할 수 있는가"**를 보여주기 위한 기술 상세입니다.
+> 시스템별로 **구현한 기능 → 사용한 핵심 함수·API → 설계 포인트** 순으로 정리했습니다.
+> (스크립트는 `Assets/_Project/Scripts/` 아래에 역할별 폴더로 분리)
+
+### 🏛️ 전체 설계 원칙
+
+프로젝트 전반에 **일관된 설계 철학**을 적용했습니다.
+
+| 원칙 | 어떻게 적용했나 |
+|------|----------------|
+| **관심사 분리** | '감지/입력'과 '실제 동작'을 다른 클래스로 분리 (예: `PlayerInteractor`는 감지만, `Door`는 여닫기만) |
+| **인터페이스 추상화** | `IInteractable` 하나로 문·키패드를 동일하게 처리 → 새 상호작용 물체 추가 시 플레이어 코드 수정 없음 |
+| **다형성 (추상 클래스)** | `Anomaly` 상속으로 이상현상 변형 확장 → 매니저 코드 변경 없이 종류 추가 |
+| **싱글톤** | `GameManager`·`JudgmentUI`를 전역 접근점으로 두어 시스템 간 연결을 단순화 |
+| **코드 내장 입력** | 새 Input System을 `.inputactions` 에셋 없이 **코드로 바인딩** → 스크립트 단독 동작 |
+
+---
+
+### 1️⃣ 1인칭 컨트롤러 — `FirstPersonController.cs`
+
+**기능:** WASD 이동 · 마우스 시점 회전(몸통 Yaw / 카메라 Pitch 분리) · 중력
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `InputAction` + `AddCompositeBinding("2DVector")` | WASD 4키를 하나의 `Vector2` 입력으로 합성 |
+| `moveAction.ReadValue<Vector2>()` | 매 프레임 이동 입력 읽기 |
+| `CharacterController.Move()` / `.isGrounded` | 물리 이동 + 바닥 판정 |
+| `transform.Rotate()` / `Quaternion.Euler()` | 몸통 좌우 회전 / 카메라 상하 기울임 |
+| `Mathf.Clamp()` | 시점이 뒤로 넘어가지 않게 상하 각도 제한 |
+| `Vector3.ClampMagnitude()` | 대각선 이동이 √2배 빨라지는 것 방지 |
+| `Cursor.lockState` / `Cursor.visible` | 1인칭 조작감(커서 잠금·숨김) |
+
+**설계 포인트:** Yaw(몸통)와 Pitch(카메라)를 분리해 몸은 수평 유지 → 시선 상하가 이동 방향에 영향을 주지 않는 1인칭 정석 구조. 이동 상태(`IsMoving`)와 조작 잠금(`ControlsLocked`)을 프로퍼티로 노출해 손 애니메이션·UI가 참조하게 함.
+
+### 🖐️ 손 애니메이션 — `HandAnimator.cs`
+
+**기능:** 걷기/정지에 따라 손 Idle ↔ Walk 전환
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `GetComponentsInChildren<Animator>()` | 좌/우 손 Animator를 한 번에 수집 |
+| `Animator.StringToHash("IsMoving")` | 파라미터 이름을 해시로 캐싱(매 프레임 문자열 비교 비용 제거) |
+| `Animator.SetBool()` | 이동 여부를 Animator에 전달 |
+
+**설계 포인트:** 이동 '판단'은 컨트롤러가, 애니메이션 '반영'은 여기서 → 로직과 표현(연출)을 분리.
+
+---
+
+### 2️⃣ 상호작용 시스템 — `PlayerInteractor.cs` + `IInteractable.cs`
+
+**기능:** 카메라 정면을 조준해 상호작용 가능한 물체를 감지하고 E로 작동
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `Physics.Raycast(ray, out hit, range, layerMask, QueryTriggerInteraction.Collide)` | 시선 정면·사거리 내 물체 감지 (트리거 콜라이더도 조준 대상에 포함) |
+| `LayerMask` (Interactable 레이어) | 상호작용 대상 레이어만 필터링 |
+| `hit.collider.GetComponentInParent<IInteractable>()` | 콜라이더가 자식(문짝)에 있어도 부모의 상호작용 컴포넌트 탐색 |
+| `interactAction.WasPressedThisFrame()` | E 입력 감지 |
+
+**설계 포인트:** 대상이 문인지 키패드인지 몰라도 `Interact()` 하나로 처리(인터페이스 다형성). 조준 대상의 안내 문구(`Prompt`)를 UI가 읽어가 화면에 표시. 조준 필터는 **레이어(Interactable)** 로 하고, 조준되면 안 되는 볼륨(복도 순간이동 트리거)은 다른 레이어에 두어 `LayerMask` 단계에서 제외한다.
+
+**해결한 이슈 2건:**
+- 🐛 **UI 열린 채 상호작용 유지** — 판정 UI가 열려 커서가 풀린 상태에서도 E로 문이 여닫히던 문제를, `JudgmentUI.IsOpen`일 때 상호작용을 멈추도록 가드를 추가해 해결.
+- 🐛 **키패드가 조준되지 않음** — 키패드의 상호작용 콜라이더가 트리거(IsTrigger)라, 트리거를 무시하는 Raycast 설정에서는 조준되지 않던 문제를 `QueryTriggerInteraction.Collide`로 트리거도 잡도록 명시해 해결.
+
+### 🚪 코드 제어 문 — `Door.cs`
+
+**기능:** 경첩식으로 부드럽게 여닫힘. **플레이어용(E 토글)과 시스템용(자동 개폐)을 한 클래스로**
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `StartCoroutine` / `StopCoroutine` + `IEnumerator` | 프레임에 걸친 문 회전 애니메이션 |
+| `Quaternion.Slerp()` | 현재 각도 → 목표 각도 부드러운 보간 |
+| `Quaternion.AngleAxis()` | 경첩 축 기준 열림 각도 계산 |
+
+**설계 포인트:** `Interact()`는 잠금(`isLocked`)을 존중하지만, `Open()`/`Close()`는 코드 전용이라 잠금을 무시 → 평소엔 못 여는 복도 문을 `GameManager`가 직접 여닫음. 보간을 현재 각도에서 시작해 여닫는 중간에 방향이 바뀌어도 자연스러움.
+
+---
+
+### 3️⃣ ⭐ 공간 반복(순간이동) 트릭 — `PlayerTeleporter.cs` + `HallwayTeleportTrigger.cs`
+
+**기능(메인):** 어두운 복도를 걷는 사이 플레이어를 몰래 시작점으로 순간이동 → 끊김 없는 무한 복도 착시
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `CharacterController.enabled = false/true` | **순간이동 순간에만 잠깐 끄고 위치 변경 후 다시 켜기** |
+| `transform.SetPositionAndRotation()` | 위치·회전을 한 번에 리셋 |
+| `OnTriggerEnter(Collider)` | 복도 중간 트리거 볼륨 통과 감지 |
+| `GetComponentInParent<PlayerTeleporter>()` | 트리거에 닿은 게 플레이어인지 식별 |
+
+**설계 포인트(핵심 함정):** CharacterController는 자기 위치를 스스로 관리해서, 켜진 채로 `transform.position`을 바꾸면 무시되거나 충돌로 튕긴다. → **잠깐 비활성화 후 위치를 옮기고 다시 켜는 것**이 안전한 순간이동의 핵심. 트리거(이음새)를 어둠 속에 배치해 전환 순간을 감춤.
+
+---
+
+### 4️⃣ 랜덤 이상현상 시스템 — `Anomaly.cs`(추상) + `AnomalyManager.cs`
+
+**기능:** *"시스템은 1개, 변형은 N개"* — 방마다 랜덤으로 이상현상 발동, 리셋 시 항상 정상 복원
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `abstract class` + `abstract void Activate()/Deactivate()` | 모든 변형의 공통 규격 정의(다형성 기반) |
+| `Random.value` / `Random.Range()` | 이상현상 유무·종류 랜덤 결정 |
+| `GameObject.SetActive()` (`ToggleAnomaly`) | 시체 소실/증가 (켜고 끄기) |
+| `Transform.SetPositionAndRotation()` (`TransformAnomaly`) | 시체 이동/자세 변화 (원래 값은 `Awake`에서 자동 저장) |
+
+**구현된 변형 3종:** 시체 소실 · 시체 이동(자세 변화) · 시체 증가
+**설계 포인트:** `AnomalyManager`는 `Anomaly` 타입만 알면 되고, 새 변형을 추가해도 매니저 코드는 그대로. 발동 전 항상 `DeactivateAll()`로 완전 복원해 이전 이상현상이 남는 버그를 원천 차단.
+
+---
+
+### 5️⃣ 판정 UI + 모드 전환 — `JudgmentUI.cs` + `JudgmentPanel.cs` + `InteractionPromptUI.cs`
+
+**기능:** 키패드 상호작용 → O(있음)/X(없음) 판정 → 1인칭 ↔ UI 모드 전환
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| uGUI `Button.onClick` (이벤트 기반) | O/X 버튼 입력 수집 |
+| `Cursor.lockState` / `.visible` 전환 | UI 열림 시 커서 해제, 닫힘 시 재잠금 |
+| `FirstPersonController.ControlsLocked` | UI 열린 동안 1인칭 조작 잠금 |
+| `TextMeshProUGUI.text` | 조준 대상 안내 문구 표시 |
+
+**설계 포인트:** UI는 '입력 수집'만 하고 판정 로직은 `GameManager`에 위임(관심사 분리). 커서 잠금·조작 잠금을 한 곳(`Show`/`Hide`)에서 일관되게 전환.
+
+---
+
+### 6️⃣ 🎬 중앙 상태 관리 — `GameManager.cs`
+
+**기능:** 진행도(정답 +1 / 오답 0 리셋, 8연속 클리어) · 판정 처리 · 루프 진행 지휘
+
+| 사용한 함수·API | 용도 |
+|----------------|------|
+| `static Instance` (싱글톤) | 판정 UI·복도 트리거가 쉽게 접근 |
+| 상태 필드(`progress`/`judged`/`currentRoomHasAnomaly`) | 진행도·중복 판정 방지·현재 방 정답 관리 |
+| `Judge()` → `Door.Open()` → 트리거 `AdvanceToNextRoom()` → `Teleport` + `SetupRoom()` | 게임 루프 한 흐름을 한곳에서 조율 |
+
+**설계 포인트:** 각 시스템(문·순간이동·이상현상)은 자기 일만 하고, **순서와 진행 판단은 `GameManager`가 지휘** → 시스템 간 직접 의존을 줄이고 흐름을 한눈에 파악 가능.
+
+---
+
 *이 문서는 포트폴리오의 방향을 정의하는 기반 문서이며, 개발이 진행되며 계속 업데이트됩니다.*
