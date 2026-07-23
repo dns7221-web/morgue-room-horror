@@ -75,3 +75,7 @@ crashlytics-build.properties
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Editor / IDE local settings
+.vscode/
+*.slnx
