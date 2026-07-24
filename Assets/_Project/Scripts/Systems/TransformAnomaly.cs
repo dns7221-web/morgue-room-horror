@@ -16,27 +16,34 @@ public class TransformAnomaly : Anomaly
     [SerializeField] private Transform anomalyPose;
 
     // 정상 상태(원래 자리) 자동 저장용.
-    private Vector3 normalPosition;
-    private Quaternion normalRotation;
+    // ── 함정: 로컬 좌표로 저장해야 한다 ──────────────────
+    // 월드 좌표(target.position)로 저장하면, LoopGroup 전체가 이동하는
+    // 순간 target도 같이 움직이지만 저장된 값은 이동 전 좌표 그대로라
+    // Deactivate() 시 시체가 옛 위치(방이 있던 자리)로 튕겨나간다.
+    // target과 anomalyPose가 같은 부모의 형제라는 전제 하에 로컬 좌표를 쓴다.
+    private Vector3 normalLocalPosition;
+    private Quaternion normalLocalRotation;
 
     private void Awake()
     {
         if (target != null)
         {
-            normalPosition = target.position;
-            normalRotation = target.rotation;
+            normalLocalPosition = target.localPosition;
+            normalLocalRotation = target.localRotation;
         }
     }
 
     public override void Activate()
     {
         if (target == null || anomalyPose == null) return;
-        target.SetPositionAndRotation(anomalyPose.position, anomalyPose.rotation);
+        target.localPosition = anomalyPose.localPosition;
+        target.localRotation = anomalyPose.localRotation;
     }
 
     public override void Deactivate()
     {
         if (target == null) return;
-        target.SetPositionAndRotation(normalPosition, normalRotation);
+        target.localPosition = normalLocalPosition;
+        target.localRotation = normalLocalRotation;
     }
 }

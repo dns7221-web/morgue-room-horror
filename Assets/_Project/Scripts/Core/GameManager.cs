@@ -17,12 +17,12 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     [Header("References")]
-    [Tooltip("플레이어 순간이동 담당.")]
+    [Tooltip("방 모듈 풀. 재활용으로 공간 반복을 만든다 (활성 모듈이 곧 현재 방).")]
+    [SerializeField] private RoomModulePool pool;
+    [Tooltip("플레이어 순간이동 담당. 암전 순간 새 모듈 시작점으로 스냅.")]
     [SerializeField] private PlayerTeleporter teleporter;
-    [Tooltip("코드로 여닫는 복도 문(들). 이중문이면 문짝 2개 모두 등록 (Is Locked 체크된 것).")]
-    [SerializeField] private Door[] hallwayDoors;
-    [Tooltip("이상현상 관리자. 방 세팅 시 랜덤 이상현상을 켜고 끈다.")]
-    [SerializeField] private AnomalyManager anomalyManager;
+    [Tooltip("복도 통과 시 화면을 검게 페이드해 모듈 스왑 순간을 가리는 연출 (선택). 비우면 즉시 스왑.")]
+    [SerializeField] private ScreenFader screenFader;
 
     [Header("Rules")]
     [Tooltip("이 횟수만큼 연속 성공하면 클리어.")]
@@ -76,7 +76,8 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
-        SetupRoom();   // 첫 방 준비
+        pool.Initialize();   // 모듈 풀 생성 + 첫 모듈 배치
+        SetupRoom();         // 첫 방 이상현상 세팅
     }
 
     private void Update()
@@ -108,26 +109,55 @@ public class GameManager : MonoBehaviour
             Debug.Log("[GameManager] 오답! 진행도 0으로 초기화");
         }
 
-        // 정답/오답과 무관하게 복도 문(들)을 열어 다음 루프로 나가게 한다.
-        foreach (var door in hallwayDoors)
-            if (door != null) door.Open();
+        // 정답/오답과 무관하게 활성 모듈의 복도 문(들)을 열어 다음 루프로 나가게 한다.
+        pool.Active.OpenDoors();
     }
 
-    /// <summary>복도 중간 트리거에서 호출: 순간이동 + 다음 방 세팅.</summary>
+    /// <summary>
+    /// 복도 중간 트리거에서 호출: 다음 방으로 진행.
+    /// 페이더가 있으면 화면이 완전히 검어진 순간에 실제 스왑(DoAdvance)을 실행해
+    /// 모듈이 교체되는 장면을 가린다. 없으면 즉시 스왑한다.
+    /// </summary>
     public void AdvanceToNextRoom()
     {
-        if (teleporter != null) teleporter.TeleportToStart();
-        foreach (var door in hallwayDoors)
-            if (door != null) door.Close();
-        SetupRoom();
+        if (screenFader != null) screenFader.FadeThrough(DoAdvance);
+        else DoAdvance();
     }
 
-    /// <summary>새 방 준비: 이상현상 유무 랜덤 결정 + 판정 상태 초기화.</summary>
+    /// <summary>
+    /// 실제 진행 처리 (암전 순간): 모듈 재활용 + 새 이상현상 세팅 +
+    /// 플레이어를 새 모듈의 복도 쪽 시작점으로 스냅.
+    ///
+    /// 문은 닫지 않고 오히려 연다 — 플레이어가 복도(문 밖)에 스폰되므로,
+    /// 걸어 들어올 수 있으려면 문이 열려 있어야 한다. 방 안쪽 트리거
+    /// (RoomEntryTrigger)를 지나면 그때 OnPlayerEnteredRoom()이 문을 닫는다.
+    /// </summary>
+    private void DoAdvance()
+    {
+        pool.Recycle();       // 새 모듈 등장 / 옛 모듈 컬링
+        SetupRoom();          // 새 모듈에 이상현상 세팅
+        pool.Active.OpenDoors();
+
+        var start = pool.Active.StartPoint;
+        if (teleporter != null && start != null)
+            teleporter.TeleportTo(start.position, start.rotation);
+    }
+
+    /// <summary>
+    /// 방 안쪽 트리거(RoomEntryTrigger)에서 호출: 플레이어가 문을 지나
+    /// 방 안으로 확실히 들어왔으므로 문을 닫는다 (판정해야 다시 열림).
+    /// </summary>
+    public void OnPlayerEnteredRoom()
+    {
+        pool.Active.CloseDoors();
+    }
+
+    /// <summary>현재 활성 모듈에 이상현상 유무를 랜덤 세팅 + 판정 상태 초기화.</summary>
     private void SetupRoom()
     {
         currentRoomHasAnomaly = Random.value < anomalyChance;
         judged = false;
-        if (anomalyManager != null) anomalyManager.SetAnomaly(currentRoomHasAnomaly);
+        pool.Active.SetAnomaly(currentRoomHasAnomaly);
         Debug.Log($"[GameManager] 새 방 준비 — 이상현상: {(currentRoomHasAnomaly ? "있음" : "없음")}");
     }
 
