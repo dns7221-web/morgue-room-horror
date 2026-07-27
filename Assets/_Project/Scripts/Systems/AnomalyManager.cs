@@ -16,12 +16,22 @@ public class AnomalyManager : MonoBehaviour
     // 현재 발동 중인 이상현상 (없으면 null).
     private Anomaly current;
 
+    // GameManager가 이미 이 방을 세팅했는가.
+    private bool configured;
+
     /// <summary>현재 발동 중인 이상현상 이름 (디버그/로그용). 없으면 "없음".</summary>
     public string CurrentName => current != null ? current.AnomalyName : "없음";
 
     private void Start()
     {
-        // 시작 시 전부 정상 상태로 정리 (씬에서 실수로 켜져 있어도 복원).
+        // ── 함정: 이 Start는 GameManager.Start '뒤에' 돈다 ────────────
+        // 모듈은 GameManager.Start 안에서 Instantiate되므로, 갓 만들어진
+        // 오브젝트의 Start는 그 다음 프레임 직전에야 실행된다. 무조건
+        // DeactivateAll()을 부르면 방금 GameManager가 켜준 첫 방 이상현상을
+        // 도로 꺼버린다 (첫 방이 항상 '정상'으로 나오던 원인).
+        if (configured) return;
+
+        // 아직 세팅 전이면, 씬에서 실수로 켜져 있는 것들을 정리한다.
         DeactivateAll();
     }
 
@@ -31,6 +41,8 @@ public class AnomalyManager : MonoBehaviour
     /// </summary>
     public void SetAnomaly(bool hasAnomaly)
     {
+        configured = true;
+
         // 항상 이전 상태부터 완전 복원 (이전 이상현상이 남는 버그 방지).
         DeactivateAll();
 

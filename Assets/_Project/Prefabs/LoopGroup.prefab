@@ -370,7 +370,7 @@ GameObject:
   - component: {fileID: 3033037696385154452}
   - component: {fileID: 1350004018232680395}
   m_Layer: 0
-  m_Name: HallwayTrigger
+  m_Name: SeamTrigger
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -423,7 +423,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d88897377ffc51a409ff4a4dd5841f64, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HallwayTeleportTrigger
+  m_EditorClassIdentifier: Assembly-CSharp::SeamTrigger
 --- !u!1 &9182747083902874516
 GameObject:
   m_ObjectHideFlags: 0

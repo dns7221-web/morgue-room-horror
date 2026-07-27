@@ -317,9 +317,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoomModulePool
   modulePrefab: {fileID: 359860488709401429, guid: c9b67b069647e7b4bb4c8ed6b7536c54, type: 3}
-  activeAnchor: {fileID: 513282693}
-  parkAnchor: {fileID: 668944761}
-  poolSize: 2
+  rootAnchor: {fileID: 513282693}
 --- !u!4 &231679686
 Transform:
   m_ObjectHideFlags: 0
@@ -610,7 +608,7 @@ GameObject:
   m_Component:
   - component: {fileID: 513282693}
   m_Layer: 0
-  m_Name: ActiveAnchor
+  m_Name: RootAnchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1944,7 +1942,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   pool: {fileID: 231679685}
   teleporter: {fileID: 1994007109}
-  screenFader: {fileID: 1002458130}
   clearGoal: 8
   anomalyChance: 0.5
   enableTestKeys: 0
