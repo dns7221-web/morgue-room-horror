@@ -9,9 +9,10 @@ using UnityEngine;
 /// 깨지지 않고, 덕분에 RoomModulePool이 이 프리팹을 여러 개 복제해 조립할 수 있다.
 ///
 /// ── 형태 ──────────────────────────────────────────────
-/// 이 모듈은 <b>막다른 방</b>이다: [영안실] ── 복도 ── (열린 끝 = 소켓)
-/// 출입구가 복도 끝 하나뿐이므로, 두 모듈은 소켓끼리 마주보게 붙어
-/// 「방A ─ 복도A ─╫─ 복도B ─ 방B」 형태의 왕복 통로를 이룬다.
+/// 이 모듈은 <b>막다른 방</b>이다: [영안실] ── 복도 ── (끝 = 소켓)
+/// 소켓은 실제로 통과하는 문이 아니라 <b>배치 기준점</b>이다. 이 지점을 축으로
+/// 모듈을 뒤집어 반대편에 다시 놓으면, 건물이 좌↔우로 옮겨간 것처럼 보인다.
+/// (실제로 벽을 뚫어 이어붙이지는 않는다 — 이음새가 눈에 띄기 때문)
 ///
 /// GameManager/Pool은 이 모듈에게 "이상현상 켜라 / 문 열어라 / 저기 붙어라"만
 /// 지시하고, 실제 처리는 각 하위 시스템에 위임한다 (관심사 분리).
@@ -58,37 +59,51 @@ public class RoomModule : MonoBehaviour
             if (d != null) d.Close();
     }
 
-    /// <summary>지정 앵커의 위치·회전으로 이동시킨다 (체인의 첫 모듈 배치용).</summary>
+    /// <summary>모듈 전체를 켜고 끈다 (컬링 — 비활성 모듈은 렌더링 부담 제거).</summary>
+    public void SetVisible(bool on) => gameObject.SetActive(on);
+
+    /// <summary>지정 앵커의 위치·회전으로 이동시킨다.</summary>
     public void PlaceAt(Transform anchor)
     {
         transform.SetPositionAndRotation(anchor.position, anchor.rotation);
     }
 
+    /// <summary>지정한 위치·회전으로 이동시킨다 (미리 계산해둔 배치 슬롯 적용용).</summary>
+    public void PlaceAt(Vector3 position, Quaternion rotation)
+    {
+        transform.SetPositionAndRotation(position, rotation);
+    }
+
     /// <summary>
-    /// 내 소켓이 <paramref name="otherSocket"/>과 정면으로 맞물리도록 모듈 전체를 배치한다.
+    /// 내 소켓이 주어진 소켓 자세와 <b>정면으로 마주보도록</b> 모듈 전체를 배치한다.
+    /// 소켓 지점을 축으로 모듈을 반대편으로 뒤집는 계산.
     ///
     /// ── 계산 ──────────────────────────────────────────
-    /// ① 회전: 내 소켓의 forward가 상대 소켓의 <b>반대</b> 방향을 보게 만든다.
+    /// ① 회전: 내 소켓의 forward가 기준 소켓의 <b>반대</b> 방향을 보게 만든다.
     ///    루트에 곱할 보정 회전 = 목표회전 × 현재소켓회전⁻¹
     ///    (소켓은 루트에 고정돼 있으므로, 루트를 R만큼 돌리면 소켓도 R만큼 돈다)
     /// ② 이동: ①이 끝나 소켓이 새 방향을 잡은 <b>뒤에</b>, 두 소켓 위치가
     ///    겹치도록 루트를 평행이동한다. (순서를 바꾸면 회전이 위치를 흐트러뜨린다)
     ///
+    /// Transform이 아니라 값(위치·회전)을 받는 이유: 기준이 되는 소켓이
+    /// <b>바로 이 모듈 자신의</b> 소켓인 경우가 있어서, 살아있는 Transform을
+    /// 참조하면 ①에서 움직이는 순간 기준점까지 같이 흔들린다.
+    ///
     /// 좌표를 하나도 하드코딩하지 않으므로, 모듈 길이가 바뀌어도 그대로 동작한다.
     /// </summary>
-    public void ConnectTo(Transform otherSocket)
+    public void AlignSeamTo(Vector3 socketPosition, Quaternion socketRotation)
     {
         if (seamSocket == null)
         {
-            Debug.LogError($"[RoomModule] {name}: seamSocket이 비어 있어 연결할 수 없습니다.", this);
+            Debug.LogError($"[RoomModule] {name}: seamSocket이 비어 있어 배치를 계산할 수 없습니다.", this);
             return;
         }
 
         // ① 회전 — 마주보게(forward 반대)
-        Quaternion desired = Quaternion.LookRotation(-otherSocket.forward, Vector3.up);
+        Quaternion desired = Quaternion.LookRotation(-(socketRotation * Vector3.forward), Vector3.up);
         transform.rotation = desired * Quaternion.Inverse(SeamSocket.rotation) * transform.rotation;
 
         // ② 이동 — 회전 후의 소켓 위치를 읽어 평행이동
-        transform.position += otherSocket.position - SeamSocket.position;
+        transform.position += socketPosition - SeamSocket.position;
     }
 }

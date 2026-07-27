@@ -318,6 +318,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoomModulePool
   modulePrefab: {fileID: 359860488709401429, guid: c9b67b069647e7b4bb4c8ed6b7536c54, type: 3}
   rootAnchor: {fileID: 513282693}
+  parkAnchor: {fileID: 668944761}
+  poolSize: 2
 --- !u!4 &231679686
 Transform:
   m_ObjectHideFlags: 0
@@ -1942,6 +1944,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   pool: {fileID: 231679685}
   teleporter: {fileID: 1994007109}
+  screenFader: {fileID: 1002458130}
   clearGoal: 8
   anomalyChance: 0.5
   enableTestKeys: 0

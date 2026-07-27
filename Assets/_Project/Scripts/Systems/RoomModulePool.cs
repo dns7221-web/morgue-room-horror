@@ -2,76 +2,126 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 방 모듈 2개를 소켓끼리 맞물려 조립하고, 지금 플레이어가 있는 모듈을 추적하는 체인.
-/// 공간 반복 트릭의 심장.
+/// 방 모듈을 소수(기본 2개)만 만들어 돌려쓰는 풀. 공간 반복 트릭의 심장.
 ///
-/// ── 배치 ──────────────────────────────────────────────
-///   [방A] ── 복도A ──╫── 복도B ── [방B]
-///                   ↑ 이음새(소켓 접합부)
-/// 모듈이 막다른 방(출입구 = 복도 끝 하나)이라, 소켓끼리 마주보게 붙이면
-/// 자연히 <b>영안실이 양 끝에 서로 등지고</b> 놓인다. 플레이어는 한쪽 방에서
-/// 판정 → 복도를 <b>계속 걸어</b> → 반대쪽 방 도착. 매 루프마다 영안실이
-/// 앞↔뒤로 뒤집히는 게 이 배치에서 공짜로 나온다.
+/// ── 어떻게 속이나 ──────────────────────────────────────
+/// 화면이 완전히 검어진 <b>암전 순간</b>에 이 세 가지가 동시에 일어난다.
+///   ① 지금 건물을 끄고(컬링) 화면 밖 대기 위치로 치운다
+///   ② 다음 건물을 <b>반대쪽 슬롯</b>에 켜서 세운다
+///   ③ 플레이어를 새 건물의 복도 문 앞으로 스냅
+/// 밝아지면 플레이어는 "복도를 걷다 보니 다시 영안실 문 앞"이라고 느낀다.
+///
+/// 씬뷰에서 보면 건물이 오른쪽에서 사라지고 왼쪽에 다시 서는 게 보인다.
+/// 화면에 존재하는 건물은 <b>언제나 하나뿐</b>이라, 두 건물을 이어붙였을 때처럼
+/// 이음새가 눈에 띌 일이 없다.
 ///
 /// ── 프로그래밍 포인트 ──────────────────────────────────
-///  • 소켓 기반 조립: 좌표 하드코딩 없이 RoomModule.ConnectTo로 계산 배치.
-///    모듈 길이를 바꿔도 씬을 다시 안 만져도 된다.
-///  • 재활용: 방 실물은 2개뿐. 무한히 생성하는 대신, 플레이어가 못 보는
-///    <b>반대편 방</b>을 몰래 새로 꾸며(Redress) 무한한 것처럼 속인다.
-///  • 순간이동·암전이 필요 없다 — 두 모듈이 실제로 이어붙어 있으므로
-///    플레이어는 처음부터 끝까지 <b>진짜로 걸어서</b> 이동한다.
+///  • 오브젝트 풀링: 무한 생성 대신 몇 개를 순환 → 메모리/GC 부담 없음.
+///  • 컬링 최적화: 한 번에 하나만 활성(SetActive), 나머지는 꺼서 렌더링 제거.
+///  • 배치 슬롯 실측: 좌우 슬롯을 씬에 손으로 찍지 않고 <b>소켓으로 계산</b>한다
+///    (Initialize 참고). 모듈 크기가 바뀌어도 씬을 다시 안 만져도 된다.
 ///
-/// 막다른 모듈은 접합부가 하나뿐이라 2개까지만 이어붙는다 (그래서 개수 고정).
+/// 실제 스왑 타이밍은 GameManager가 '화면 암전 순간'에 Recycle()을 호출해 맞춘다.
 /// </summary>
 public class RoomModulePool : MonoBehaviour
 {
-    /// <summary>막다른 모듈은 소켓이 하나뿐이라 2개가 최대이자 필요 전부.</summary>
-    private const int ModuleCount = 2;
-
     [Header("Setup")]
-    [Tooltip("복제해서 이어붙일 방 모듈 프리팹.")]
+    [Tooltip("복제해서 돌려쓸 방 모듈 프리팹.")]
     [SerializeField] private RoomModule modulePrefab;
-    [Tooltip("체인의 첫 모듈이 놓일 기준 위치·회전. 두 번째는 여기에 맞물려 자동 배치된다.")]
+    [Tooltip("첫 번째 배치 슬롯. 두 번째 슬롯은 모듈 소켓을 기준으로 자동 계산된다.")]
     [SerializeField] private Transform rootAnchor;
+    [Tooltip("비활성(대기) 모듈이 숨는 위치. 화면 밖 아무 데나.")]
+    [SerializeField] private Transform parkAnchor;
+    [Tooltip("돌려쓸 모듈 개수. 2면 충분 (필요시 늘려도 됨).")]
+    [SerializeField, Min(2)] private int poolSize = 2;
 
-    private readonly List<RoomModule> modules = new();
-    private int currentIndex;
+    private readonly List<RoomModule> pool = new();
 
-    /// <summary>지금 플레이어가 있는 쪽 모듈.</summary>
-    public RoomModule Current => modules[currentIndex];
+    // 번갈아 쓸 배치 슬롯 2곳 (좌/우). Initialize에서 소켓으로 실측해 채운다.
+    private readonly List<Pose> slots = new();
 
-    /// <summary>반대편(플레이어가 못 보는) 모듈. 여기를 몰래 새로 꾸민다.</summary>
-    public RoomModule Far => modules[(currentIndex + 1) % ModuleCount];
+    private int activeIndex;
+    private int slotIndex;
 
-    /// <summary>모듈 2개 생성 + 소켓 접합. GameManager.Start()에서 1회 호출.</summary>
+    /// <summary>현재 활성(플레이어가 있는) 모듈.</summary>
+    public RoomModule Active => pool[activeIndex];
+
+    /// <summary>풀 생성 + 배치 슬롯 계산 + 첫 모듈 배치. GameManager.Start()에서 1회 호출.</summary>
     public void Initialize()
     {
-        for (int i = 0; i < ModuleCount; i++)
+        for (int i = 0; i < poolSize; i++)
         {
             var m = Instantiate(modulePrefab, transform);
             m.name = $"{modulePrefab.name}_{i}";
-
-            if (i == 0) m.PlaceAt(rootAnchor);                  // 첫 모듈: 기준 앵커에
-            else m.ConnectTo(modules[i - 1].SeamSocket);        // 나머지: 앞 모듈 소켓에 맞물림
-
-            modules.Add(m);
+            pool.Add(m);
         }
 
-        currentIndex = 0;
+        MeasureSlots();
+
+        // 전부 화면 밖으로 치우고 끈 뒤, 첫 모듈만 슬롯 0에 세운다.
+        foreach (var m in pool)
+        {
+            m.PlaceAt(parkAnchor);
+            m.SetVisible(false);
+        }
+
+        activeIndex = 0;
+        slotIndex = 0;
+        Active.PlaceAt(slots[0].position, slots[0].rotation);
+        Active.SetVisible(true);
     }
 
     /// <summary>
-    /// 플레이어가 이음새를 넘어 <paramref name="entered"/> 모듈로 들어왔음을 반영한다.
-    /// 이미 그 모듈이면 아무 일도 하지 않는다 — 이음새 위에서 왔다 갔다 해도
-    /// 상태가 꼬이지 않도록 <b>멱등</b>하게 만든 것 (카운터를 돌리는 방식의 함정).
+    /// 배치 슬롯 두 곳을 <b>모듈 자신을 자로 삼아</b> 실측한다.
+    ///
+    /// 슬롯0 = rootAnchor 그대로.
+    /// 슬롯1 = 소켓 지점을 축으로 180° 뒤집은 자리 — 건물이 복도 끝 너머
+    ///         반대편에 서는 위치다. 좌표를 씬에 하드코딩하지 않으므로,
+    ///         복도를 늘리든 줄이든 슬롯이 알아서 따라온다.
     /// </summary>
-    /// <returns>실제로 현재 모듈이 바뀌었으면 true.</returns>
-    public bool SetCurrent(RoomModule entered)
+    private void MeasureSlots()
     {
-        int index = modules.IndexOf(entered);
-        if (index < 0 || index == currentIndex) return false;
+        var probe = pool[0];
 
-        currentIndex = index;
-        return true;
+        probe.PlaceAt(rootAnchor);
+        slots.Add(new Pose(probe.transform.position, probe.transform.rotation));
+
+        if (probe.SeamSocket == null)
+        {
+            // 소켓이 없으면 뒤집을 기준이 없다. 크래시 대신 슬롯 하나로 굴러가게 두고
+            // (= 예전처럼 제자리 반복) 원인을 로그로 남긴다.
+            Debug.LogError(
+                $"[RoomModulePool] {modulePrefab.name}에 Seam Socket이 없어 반대편 슬롯을 계산할 수 없습니다. " +
+                "건물이 늘 같은 자리에 나타납니다.", this);
+            return;
+        }
+
+        // 소켓 자세를 '값'으로 떠 놓는다 — probe를 움직이면 소켓도 같이 움직이므로.
+        Vector3 seamPos = probe.SeamSocket.position;
+        Quaternion seamRot = probe.SeamSocket.rotation;
+
+        probe.AlignSeamTo(seamPos, seamRot);
+        slots.Add(new Pose(probe.transform.position, probe.transform.rotation));
+    }
+
+    /// <summary>
+    /// 화면 암전 순간 호출: 다음 모듈을 <b>반대쪽 슬롯</b>에 세워 활성화하고,
+    /// 방금까지의 모듈은 화면 밖으로 치우며 비활성화(컬링)한다.
+    /// </summary>
+    /// <returns>새로 활성화된 모듈.</returns>
+    public RoomModule Recycle()
+    {
+        var prev = Active;
+
+        activeIndex = (activeIndex + 1) % pool.Count;
+        slotIndex = (slotIndex + 1) % slots.Count;   // ← 좌↔우 번갈아
+
+        Active.PlaceAt(slots[slotIndex].position, slots[slotIndex].rotation);
+        Active.SetVisible(true);                     // 새 것 등장
+
+        prev.PlaceAt(parkAnchor);
+        prev.SetVisible(false);                      // 옛 것 소멸(컬링)
+
+        return Active;
     }
 }

@@ -59,7 +59,7 @@ Transform:
   m_GameObject: {fileID: 1623545759676770909}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 4.63, y: -1.22663, z: -6.019}
+  m_LocalPosition: {x: 4.63, y: -1.22663, z: -1.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -114,6 +114,7 @@ MonoBehaviour:
   hallwayDoors:
   - {fileID: 7070908856569955850}
   - {fileID: 3791953485451181232}
+  seamSocket: {fileID: 8688255239707891720}
   startPoint: {fileID: 5297307058620120008}
 --- !u!1 &4495738896707855846
 GameObject:
@@ -292,6 +293,51 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4674546426808105313}
   m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
+--- !u!1 &6095288329254725889
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7038020612797527342}
+  - component: {fileID: 8688255239707891720}
+  m_Layer: 0
+  m_Name: SeamSocket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7038020612797527342
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6095288329254725889}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
+  m_LocalPosition: {x: 4.7253103, y: -1.306, z: -27.19577}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4674546426808105313}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+--- !u!114 &8688255239707891720
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6095288329254725889}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d80827151e04bc09fa93c4be18a94e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoomSocket
+  gizmoRadius: 1.5
 --- !u!1 &6601230949330995130
 GameObject:
   m_ObjectHideFlags: 0
@@ -385,7 +431,7 @@ Transform:
   m_GameObject: {fileID: 8022595108519782995}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 4.01931, y: -0.91, z: -27.59577}
+  m_LocalPosition: {x: 4.01931, y: -0.91, z: -23.52}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -587,7 +633,10 @@ PrefabInstance:
       value: HorrorZip
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 2201581160992126938, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
+    - {fileID: 5571225389121737887, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
+    - {fileID: 4067734676556642361, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 384814135334036927, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
       insertIndex: -1
@@ -610,6 +659,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 384814135334036927, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8323318784690376432}
+    - targetCorrespondingSourceObject: {fileID: 384814135334036927, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7038020612797527342}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1164f9a4ad6d59e4e8e464d4ff3c5793, type: 3}
 --- !u!114 &3791953485451181232 stripped
