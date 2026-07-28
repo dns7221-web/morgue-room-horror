@@ -31,6 +31,8 @@ public class RoomModule : MonoBehaviour
     [SerializeField] private Transform startPoint;
     [Tooltip("게임을 켰을 때 딱 한 번만 쓰는 지점 — 영안실 안쪽, 키패드 앞. 문을 열 필요가 없다.")]
     [SerializeField] private Transform firstEntryPoint;
+    [Tooltip("이 모듈 소속 추격자. 비워두면 추격자 없이 동작한다.")]
+    [SerializeField] private Stalker stalker;
 
     /// <summary>옆 모듈이 맞물릴 접합부 Transform.</summary>
     public Transform SeamSocket => seamSocket != null ? seamSocket.transform : null;
@@ -44,10 +46,54 @@ public class RoomModule : MonoBehaviour
     /// <summary>이번 세팅에서 이 방에 실제로 이상현상이 있는지 (판정 비교용).</summary>
     public bool HasAnomaly { get; private set; }
 
+    /// <summary>
+    /// 이번 방의 이상현상을 <b>'그것'으로 고정</b>한다.
+    ///
+    /// 랜덤 변형(시체 소실·이동·증가·서랍)은 전부 정상으로 되돌리고, 대신 영안실에
+    /// 추격자를 세운다. 정답은 O(있음) — 플레이어는 <b>관찰로 발견해야</b> 한다.
+    /// 등 뒤에서 튀어나오는 게 아니라 처음부터 거기 서 있는 것이 핵심이다.
+    /// </summary>
+    public void SetStalkerAsAnomaly()
+    {
+        HasAnomaly = true;
+        StalkerIsAnomaly = true;
+        if (anomalyManager != null) anomalyManager.SetAnomaly(false);   // 다른 변형은 정상 복원
+
+        if (stalker != null) stalker.Appear();
+        else Debug.LogWarning($"[RoomModule] {name}: Stalker가 연결돼 있지 않아 '있음'인데 아무것도 나타나지 않습니다.", this);
+    }
+
+    /// <summary>이번 방의 이상현상이 '그것'인지 (디버그 표시용).</summary>
+    public bool StalkerIsAnomaly { get; private set; }
+
+    /// <summary>이번 방 이상현상 이름 (디버그 표시용).</summary>
+    public string AnomalyLabel
+    {
+        get
+        {
+            if (!HasAnomaly) return "없음";
+            if (StalkerIsAnomaly) return "그것";
+            return anomalyManager != null ? anomalyManager.CurrentName : "있음";
+        }
+    }
+
+    /// <summary>Stalker 참조가 연결돼 있는지 (디버그 점검용).</summary>
+    public bool HasStalkerReference => stalker != null;
+
+    /// <summary>이 방의 추격자 (디버그 표시용).</summary>
+    public Stalker Stalker => stalker;
+
+    /// <summary>추격자를 물리고 등장 자리로 되돌린다.</summary>
+    public void DismissStalker()
+    {
+        if (stalker != null) stalker.Vanish();
+    }
+
     /// <summary>이상현상 유무를 세팅한다. 실제 발동/복원은 AnomalyManager가 담당.</summary>
     public void SetAnomaly(bool has)
     {
         HasAnomaly = has;
+        StalkerIsAnomaly = false;
         if (anomalyManager != null) anomalyManager.SetAnomaly(has);
     }
 
@@ -70,6 +116,20 @@ public class RoomModule : MonoBehaviour
     {
         foreach (var d in hallwayDoors)
             if (d != null) d.Slam();
+    }
+
+    /// <summary>
+    /// 안전구역 판정용 — <b>영안실 쪽 문(이중문)</b>이 전부 닫혀 있는지.
+    ///
+    /// 공간이 [복도] → [키패드 방] → [영안실] 순이고 추격자는 영안실에서 온다.
+    /// 그래서 피신처(키패드 방)를 지키는 문은 <b>복도 문이 아니라 안쪽 이중문</b>이다.
+    /// 복도 문은 반대편이라 닫아봐야 추격자를 막지 못한다.
+    /// </summary>
+    public bool AreShelterDoorsClosed()
+    {
+        foreach (var d in InteriorDoors)
+            if (d != null && d.IsOpen) return false;
+        return true;
     }
 
     /// <summary>복도 문(들)의 잠금을 설정한다. 풀어주면 플레이어가 E로 직접 열 수 있다.</summary>

@@ -31,6 +31,8 @@ public class FirstPersonController : MonoBehaviour
     [Header("Movement")]
     [Tooltip("걷기 속도 (m/s). 호러 페이싱은 느리게.")]
     [SerializeField] private float moveSpeed = 2.5f;
+    [Tooltip("뒤로 걸을 때 속도 배수. 1이면 앞뒤가 같다.")]
+    [SerializeField, Range(0.1f, 1f)] private float backwardSpeedMultiplier = 0.4f;
     [Tooltip("중력 가속도 (m/s²). 음수.")]
     [SerializeField] private float gravity = -9.81f;
 
@@ -162,8 +164,16 @@ public class FirstPersonController : MonoBehaviour
 
         // 몸통이 바라보는 방향(right/forward) 기준으로 이동 벡터를 만든다.
         Vector3 horizontal = transform.right * input.x + transform.forward * input.y;
+
+        // 뒷걸음질에 대가를 매긴다.
+        // ── 왜 필요한가 ──────────────────────────────────
+        // 추격자는 '보이면 멈추는' 규칙이라, 앞뒤 속도가 같으면 쳐다본 채 뒤로
+        // 걷는 것만으로 완전 무적이 된다. 그러면 안전구역도 쓸 이유가 없어진다.
+        // 느리게 만들어 "안전하지만 오래 걸리는 길"로 바꾼다.
+        float speed = input.y < 0f ? moveSpeed * backwardSpeedMultiplier : moveSpeed;
+
         // 대각선(예: W+D)일 때 √2배 빨라지는 것을 막고, 속도를 곱한다.
-        horizontal = Vector3.ClampMagnitude(horizontal, 1f) * moveSpeed;
+        horizontal = Vector3.ClampMagnitude(horizontal, 1f) * speed;
 
         // 바닥에 붙어있으면 살짝 눌러줘서 isGrounded를 안정화(0이면 경사·틈에서 떨림).
         if (controller.isGrounded && verticalVelocity < 0f)

@@ -38,6 +38,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int clearGoal = 8;
     [Tooltip("방에 이상현상이 나타날 확률 (0~1).")]
     [SerializeField, Range(0f, 1f)] private float anomalyChance = 0.5f;
+    [Tooltip("이 횟수만큼 누적으로 틀리면 추격자가 나타난다. 0이면 등장하지 않는다.")]
+    [SerializeField, Min(0)] private int mistakesBeforeStalker = 3;
 
     [Header("Debug")]
     [Tooltip("체크 시 O(있음)/X(없음) 키로 판정 테스트. 판정 UI 만들면 끄면 됨.")]
@@ -48,12 +50,53 @@ public class GameManager : MonoBehaviour
     private bool judged;            // 이번 방을 이미 판정했는지 (중복 방지)
     private bool doorwayOccupied;   // 플레이어 몸이 문간(문짝 궤적)에 걸쳐 있는지
 
+    // 누적 오답 수. progress는 틀릴 때마다 0으로 리셋되므로 '몇 번 틀렸나'를
+    // 따로 세야 한다. 추격자 등장 조건에 쓰고, 등장시키면 다시 0으로 돌린다.
+    private int mistakes;
+    // 플레이어가 안전구역(영안실) 안에 있는지.
+    private bool inSafeZone;
+
+    /// <summary>
+    /// 플레이어가 지금 안전한지 — <b>안전구역(키패드 방) 안 + 영안실 쪽 이중문이 닫힘</b>.
+    /// 뛰어들어오는 것만으로는 부족하고, 돌아서서 문을 닫아야 성립한다.
+    /// </summary>
+    public bool PlayerIsSheltered
+    {
+        get
+        {
+            if (!inSafeZone || pool == null) return false;
+            var active = pool.Active;
+            return active != null && active.AreShelterDoorsClosed();
+        }
+    }
+
+    /// <summary>안전구역(SafeZone) 출입 상태 갱신.</summary>
+    public void SetInSafeZone(bool inside) => inSafeZone = inside;
+
     public int Progress => progress;
     /// <summary>클리어에 필요한 연속 성공 횟수 (진행도 UI가 "n / 목표" 표시에 사용).</summary>
     public int ClearGoal => clearGoal;
     public bool IsCleared => progress >= clearGoal;
     /// <summary>이번 방을 이미 판정했는지 (키패드가 중복 판정을 막는 데 사용).</summary>
     public bool HasJudged => judged;
+
+    /// <summary>누적 오답 수 (디버그 표시용).</summary>
+    public int Mistakes => mistakes;
+    /// <summary>추격자 등장까지 필요한 누적 오답 수. 0이면 등장하지 않음.</summary>
+    public int MistakesBeforeStalker => mistakesBeforeStalker;
+    /// <summary>현재 방에 이상현상이 있는지 (디버그·강제 판정용).</summary>
+    public bool CurrentRoomHasAnomaly => pool != null && pool.Active != null && pool.Active.HasAnomaly;
+    /// <summary>현재 활성 모듈 (디버그 표시용).</summary>
+    public RoomModule CurrentRoom => pool != null ? pool.Active : null;
+
+    /// <summary>[디버그] 이번 방의 이상현상을 즉시 '그것'으로 바꾼다.</summary>
+    public void DebugMakeStalkerAnomaly()
+    {
+        if (pool == null || pool.Active == null) return;
+        pool.Active.SetStalkerAsAnomaly();
+        judged = false;
+        Debug.Log("[Debug] 이번 방 이상현상을 '그것'으로 교체");
+    }
 
     /// <summary>
     /// 현재 활성 모듈의 루트 Transform. 풀 초기화 전에는 null.
@@ -129,7 +172,12 @@ public class GameManager : MonoBehaviour
         else
         {
             progress = 0;
-            Debug.Log("[GameManager] 오답! 진행도 0으로 초기화");
+            mistakes++;
+            Debug.Log($"[GameManager] 오답! 진행도 0으로 초기화 (누적 오답 {mistakes})");
+
+            // 기준에 닿았으면 '그것'이 다음 방의 이상현상이 된다 (Dress에서 처리).
+            if (mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
+                Debug.Log("[GameManager] 다음 방에는 그것이 있다");
         }
 
         // 정답/오답과 무관하게 복도 문(들)의 잠금을 푼다.
@@ -172,6 +220,7 @@ public class GameManager : MonoBehaviour
 
         judged = false;
         doorwayOccupied = false;
+        pool.Active.DismissStalker();
         pool.Active.SetDoorsLocked(true);   // 판정 전까지 복도 문은 잠겨 있다
 
         var start = pool.Active.FirstEntryPoint;
@@ -191,6 +240,11 @@ public class GameManager : MonoBehaviour
         // 이 모듈을 지난번에 썼을 때 플레이어가 열어둔 문이 남아 있다 — 먼저 되돌린다.
         // (Dress보다 앞: 나중에 문을 쓰는 이상현상이 생겨도 덮어쓰지 않도록)
         pool.Active.ResetInteriorDoors();
+
+        // ⚠ 순서 주의: 반드시 Dress보다 <b>먼저</b> 물려야 한다.
+        // Dress가 '그것'을 이번 방의 이상현상으로 세울 수 있는데, 뒤에서 물리면
+        // 방금 세운 추격자를 그대로 지워버린다.
+        pool.Active.DismissStalker();
 
         Dress(pool.Active);
         judged = false;
@@ -230,9 +284,36 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void SetDoorwayOccupied(bool occupied) => doorwayOccupied = occupied;
 
-    /// <summary>지정 모듈에 이상현상 유무를 랜덤 세팅한다 (방 '새로 꾸미기').</summary>
+    /// <summary>
+    /// 추격자에게 잡혔을 때 호출. 진행도를 잃고 암전 뒤 다음 방으로 넘어간다.
+    /// 죽음 화면 대신 '정신을 차려보니 또 그 방'으로 처리해, 잡혔는데 왜 살아
+    /// 있는지 모르는 불안감을 남긴다.
+    /// </summary>
+    public void OnCaughtByStalker()
+    {
+        progress = 0;
+        mistakes = 0;
+        Debug.Log("[GameManager] 잡혔다 — 진행도 0");
+        AdvanceToNextRoom();
+    }
+
+    /// <summary>
+    /// 지정 모듈에 이상현상을 세팅한다 (방 '새로 꾸미기').
+    ///
+    /// 누적 오답이 기준에 닿으면 랜덤을 돌리지 않고 <b>'그것'을 이번 방의 이상현상으로
+    /// 고정</b>한다. 벌칙이되 규칙 밖의 사고가 아니라, 어디까지나 관찰로 발견하고
+    /// O로 판정해야 하는 이상현상 중 하나로 다룬다.
+    /// </summary>
     private void Dress(RoomModule module)
     {
+        if (mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
+        {
+            mistakes = 0;
+            module.SetStalkerAsAnomaly();
+            Debug.Log($"[GameManager] {module.name} 세팅 — 이상현상: 그것 (관찰해서 O로 판정할 것)");
+            return;
+        }
+
         bool has = Random.value < anomalyChance;
         module.SetAnomaly(has);
         Debug.Log($"[GameManager] {module.name} 세팅 — 이상현상: {(has ? "있음" : "없음")}");
