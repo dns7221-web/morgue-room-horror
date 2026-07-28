@@ -1,88 +1,242 @@
 fileFormatVersion: 2
 guid: 7365d78afce90da40addd9b7c10a02f7
-timeCreated: 1493495403
-licenseType: Store
 ModelImporter:
-  serializedVersion: 22
-  fileIDToRecycleName:
-    100000: animations
-    100002: Bone003
-    100004: Bone004
-    100006: Bone005
-    100008: BoneArm
-    100010: BoneHand
-    100012: BoneIndexBase
-    100014: BoneIndexEnd
-    100016: BoneIndexMid
-    100018: BoneMiddleBase
-    100020: BoneMiddleBaseEnd
-    100022: BoneMiddleMid
-    100024: BonePinkyBase
-    100026: BonePinkyEnd
-    100028: BonePinkyMid
-    100030: BoneRingBase
-    100032: BoneRingEnd
-    100034: BoneRingMiddle
-    100036: BoneWristRoll
-    100038: //RootNode
-    100040: newArm
-    400000: animations
-    400002: Bone003
-    400004: Bone004
-    400006: Bone005
-    400008: BoneArm
-    400010: BoneHand
-    400012: BoneIndexBase
-    400014: BoneIndexEnd
-    400016: BoneIndexMid
-    400018: BoneMiddleBase
-    400020: BoneMiddleBaseEnd
-    400022: BoneMiddleMid
-    400024: BonePinkyBase
-    400026: BonePinkyEnd
-    400028: BonePinkyMid
-    400030: BoneRingBase
-    400032: BoneRingEnd
-    400034: BoneRingMiddle
-    400036: BoneWristRoll
-    400038: //RootNode
-    400040: newArm
-    4300000: newArm
-    7400000: hand_beckon
-    7400002: hand_claw
-    7400004: hand_spread
-    7400006: hand_unspread
-    7400008: hand_hold_lantern
-    7400010: hand_hold_gun
-    7400012: hand_fire_gun
-    7400014: hand_turn_handle
-    7400016: hand_pickup
-    7400018: hand_allAnimations
-    7400020: hand_pose_cupped
-    7400022: hand_to_bow_string_grasp
-    7400024: hand_bow_string_grasp
-    7400026: hand_hold_stick
-    7400028: hand_hold_flashlight
-    7400030: hand_walk_motion
-    7400032: hand_running_motion
-    7400034: hand_idle_motion
-    7400036: hand_punch
-    7400038: hand_reload_magazine
-    7400040: hand_remove_magazine
-    7400042: hand_strike_with_stick
-    7400044: hand_cast_overhand
-    7400046: hand_cast_underhand
-    7400048: hand_cast_direct_Shock
-    7400050: hand_thumbs_up
-    7400052: hand_thumbs_down
-    7400054: hand_point
-    7400056: hand_rock_on
-    7400058: hand_swim_breast_stroke
-    7400060: hand_swim_front_crawl
-    7400062: hand_pickup_low
-    9500000: //RootNode
-    11100000: //RootNode
-    13700000: newArm
+  serializedVersion: 24200
+  internalIDToNameTable:
+  - first:
+      1: 100000
+    second: animations
+  - first:
+      1: 100002
+    second: Bone003
+  - first:
+      1: 100004
+    second: Bone004
+  - first:
+      1: 100006
+    second: Bone005
+  - first:
+      1: 100008
+    second: BoneArm
+  - first:
+      1: 100010
+    second: BoneHand
+  - first:
+      1: 100012
+    second: BoneIndexBase
+  - first:
+      1: 100014
+    second: BoneIndexEnd
+  - first:
+      1: 100016
+    second: BoneIndexMid
+  - first:
+      1: 100018
+    second: BoneMiddleBase
+  - first:
+      1: 100020
+    second: BoneMiddleBaseEnd
+  - first:
+      1: 100022
+    second: BoneMiddleMid
+  - first:
+      1: 100024
+    second: BonePinkyBase
+  - first:
+      1: 100026
+    second: BonePinkyEnd
+  - first:
+      1: 100028
+    second: BonePinkyMid
+  - first:
+      1: 100030
+    second: BoneRingBase
+  - first:
+      1: 100032
+    second: BoneRingEnd
+  - first:
+      1: 100034
+    second: BoneRingMiddle
+  - first:
+      1: 100036
+    second: BoneWristRoll
+  - first:
+      1: 100038
+    second: //RootNode
+  - first:
+      1: 100040
+    second: newArm
+  - first:
+      4: 400000
+    second: animations
+  - first:
+      4: 400002
+    second: Bone003
+  - first:
+      4: 400004
+    second: Bone004
+  - first:
+      4: 400006
+    second: Bone005
+  - first:
+      4: 400008
+    second: BoneArm
+  - first:
+      4: 400010
+    second: BoneHand
+  - first:
+      4: 400012
+    second: BoneIndexBase
+  - first:
+      4: 400014
+    second: BoneIndexEnd
+  - first:
+      4: 400016
+    second: BoneIndexMid
+  - first:
+      4: 400018
+    second: BoneMiddleBase
+  - first:
+      4: 400020
+    second: BoneMiddleBaseEnd
+  - first:
+      4: 400022
+    second: BoneMiddleMid
+  - first:
+      4: 400024
+    second: BonePinkyBase
+  - first:
+      4: 400026
+    second: BonePinkyEnd
+  - first:
+      4: 400028
+    second: BonePinkyMid
+  - first:
+      4: 400030
+    second: BoneRingBase
+  - first:
+      4: 400032
+    second: BoneRingEnd
+  - first:
+      4: 400034
+    second: BoneRingMiddle
+  - first:
+      4: 400036
+    second: BoneWristRoll
+  - first:
+      4: 400038
+    second: //RootNode
+  - first:
+      4: 400040
+    second: newArm
+  - first:
+      43: 4300000
+    second: newArm
+  - first:
+      74: 7400000
+    second: hand_beckon
+  - first:
+      74: 7400002
+    second: hand_claw
+  - first:
+      74: 7400004
+    second: hand_spread
+  - first:
+      74: 7400006
+    second: hand_unspread
+  - first:
+      74: 7400008
+    second: hand_hold_lantern
+  - first:
+      74: 7400010
+    second: hand_hold_gun
+  - first:
+      74: 7400012
+    second: hand_fire_gun
+  - first:
+      74: 7400014
+    second: hand_turn_handle
+  - first:
+      74: 7400016
+    second: hand_pickup
+  - first:
+      74: 7400018
+    second: hand_allAnimations
+  - first:
+      74: 7400020
+    second: hand_pose_cupped
+  - first:
+      74: 7400022
+    second: hand_to_bow_string_grasp
+  - first:
+      74: 7400024
+    second: hand_bow_string_grasp
+  - first:
+      74: 7400026
+    second: hand_hold_stick
+  - first:
+      74: 7400028
+    second: hand_hold_flashlight
+  - first:
+      74: 7400030
+    second: hand_walk_motion
+  - first:
+      74: 7400032
+    second: hand_running_motion
+  - first:
+      74: 7400034
+    second: hand_idle_motion
+  - first:
+      74: 7400036
+    second: hand_punch
+  - first:
+      74: 7400038
+    second: hand_reload_magazine
+  - first:
+      74: 7400040
+    second: hand_remove_magazine
+  - first:
+      74: 7400042
+    second: hand_strike_with_stick
+  - first:
+      74: 7400044
+    second: hand_cast_overhand
+  - first:
+      74: 7400046
+    second: hand_cast_underhand
+  - first:
+      74: 7400048
+    second: hand_cast_direct_Shock
+  - first:
+      74: 7400050
+    second: hand_thumbs_up
+  - first:
+      74: 7400052
+    second: hand_thumbs_down
+  - first:
+      74: 7400054
+    second: hand_point
+  - first:
+      74: 7400056
+    second: hand_rock_on
+  - first:
+      74: 7400058
+    second: hand_swim_breast_stroke
+  - first:
+      74: 7400060
+    second: hand_swim_front_crawl
+  - first:
+      74: 7400062
+    second: hand_pickup_low
+  - first:
+      95: 9500000
+    second: //RootNode
+  - first:
+      111: 11100000
+    second: //RootNode
+  - first:
+      137: 13700000
+    second: newArm
   externalObjects:
   - first:
       type: UnityEngine:Material
@@ -90,7 +244,7 @@ ModelImporter:
       name: defaultMat
     second: {fileID: 2100000, guid: e2070e922ac17b741a094ca1d90ea02a, type: 2}
   materials:
-    importMaterials: 0
+    materialImportMode: 0
     materialName: 0
     materialSearch: 2
     materialLocation: 0
@@ -99,14 +253,14 @@ ModelImporter:
     bakeSimulation: 0
     resampleCurves: 1
     optimizeGameObjects: 0
+    removeConstantScaleCurves: 0
     motionNodeName: 
-    rigImportErrors: 
-    rigImportWarnings: 
     animationImportErrors: 
     animationImportWarnings: 
     animationRetargetingWarnings: 
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
+    importConstraints: 0
     animationCompression: 3
     animationRotationError: 0.2
     animationPositionError: 0.2
@@ -118,6 +272,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_beckon
       takeName: Take 001
+      internalID: 0
       firstFrame: 0
       lastFrame: 130
       wrapMode: 0
@@ -186,6 +341,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_claw
       takeName: Take 001
+      internalID: 0
       firstFrame: 135
       lastFrame: 170
       wrapMode: 0
@@ -254,6 +410,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_spread
       takeName: Take 001
+      internalID: 0
       firstFrame: 185
       lastFrame: 215
       wrapMode: 0
@@ -322,6 +479,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_unspread
       takeName: Take 001
+      internalID: 0
       firstFrame: 216
       lastFrame: 242
       wrapMode: 0
@@ -390,6 +548,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_hold_lantern
       takeName: Take 001
+      internalID: 0
       firstFrame: 274
       lastFrame: 320
       wrapMode: 0
@@ -458,6 +617,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_hold_gun
       takeName: Take 001
+      internalID: 0
       firstFrame: 328
       lastFrame: 329
       wrapMode: 0
@@ -526,6 +686,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_fire_gun
       takeName: Take 001
+      internalID: 0
       firstFrame: 330
       lastFrame: 380
       wrapMode: 0
@@ -594,6 +755,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_turn_handle
       takeName: Take 001
+      internalID: 0
       firstFrame: 395
       lastFrame: 485
       wrapMode: 0
@@ -662,6 +824,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_pickup
       takeName: Take 001
+      internalID: 0
       firstFrame: 490
       lastFrame: 600
       wrapMode: 0
@@ -730,6 +893,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_allAnimations
       takeName: Take 001
+      internalID: 0
       firstFrame: 0
       lastFrame: 2710
       wrapMode: 2
@@ -798,6 +962,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_pose_cupped
       takeName: Take 001
+      internalID: 0
       firstFrame: 620
       lastFrame: 630
       wrapMode: 2
@@ -866,6 +1031,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_bow_string_grasp
       takeName: Take 001
+      internalID: 0
       firstFrame: 660
       lastFrame: 670
       wrapMode: 2
@@ -934,6 +1100,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_hold_stick
       takeName: Take 001
+      internalID: 0
       firstFrame: 680
       lastFrame: 690
       wrapMode: 0
@@ -1002,6 +1169,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_hold_flashlight
       takeName: Take 001
+      internalID: 0
       firstFrame: 705
       lastFrame: 730
       wrapMode: 2
@@ -1070,6 +1238,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_walk_motion
       takeName: Take 001
+      internalID: 0
       firstFrame: 740
       lastFrame: 850
       wrapMode: 2
@@ -1078,8 +1247,8 @@ ModelImporter:
       cycleOffset: 0
       loop: 1
       hasAdditiveReferencePose: 0
-      loopTime: 0
-      loopBlend: 0
+      loopTime: 1
+      loopBlend: 1
       loopBlendOrientation: 0
       loopBlendPositionY: 0
       loopBlendPositionXZ: 0
@@ -1138,6 +1307,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_running_motion
       takeName: Take 001
+      internalID: 0
       firstFrame: 870
       lastFrame: 980
       wrapMode: 2
@@ -1206,6 +1376,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_idle_motion
       takeName: Take 001
+      internalID: 0
       firstFrame: 1000
       lastFrame: 1140
       wrapMode: 2
@@ -1214,8 +1385,8 @@ ModelImporter:
       cycleOffset: 0
       loop: 1
       hasAdditiveReferencePose: 0
-      loopTime: 0
-      loopBlend: 0
+      loopTime: 1
+      loopBlend: 1
       loopBlendOrientation: 0
       loopBlendPositionY: 0
       loopBlendPositionXZ: 0
@@ -1274,6 +1445,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_punch
       takeName: Take 001
+      internalID: 0
       firstFrame: 1160
       lastFrame: 1260
       wrapMode: 0
@@ -1342,6 +1514,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_reload_magazine
       takeName: Take 001
+      internalID: 0
       firstFrame: 1300
       lastFrame: 1460
       wrapMode: 0
@@ -1410,6 +1583,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_remove_magazine
       takeName: Take 001
+      internalID: 0
       firstFrame: 1460
       lastFrame: 1560
       wrapMode: 0
@@ -1478,6 +1652,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_strike_with_stick
       takeName: Take 001
+      internalID: 0
       firstFrame: 1580
       lastFrame: 1760
       wrapMode: 0
@@ -1546,6 +1721,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_cast_overhand
       takeName: Take 001
+      internalID: 0
       firstFrame: 1770
       lastFrame: 1900
       wrapMode: 0
@@ -1614,6 +1790,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_cast_underhand
       takeName: Take 001
+      internalID: 0
       firstFrame: 1920
       lastFrame: 2040
       wrapMode: 0
@@ -1682,6 +1859,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_cast_direct_Shock
       takeName: Take 001
+      internalID: 0
       firstFrame: 2050
       lastFrame: 2180
       wrapMode: 0
@@ -1750,6 +1928,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_thumbs_up
       takeName: Take 001
+      internalID: 0
       firstFrame: 2180
       lastFrame: 2235
       wrapMode: 0
@@ -1818,6 +1997,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_thumbs_down
       takeName: Take 001
+      internalID: 0
       firstFrame: 2250
       lastFrame: 2313
       wrapMode: 0
@@ -1886,6 +2066,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_point
       takeName: Take 001
+      internalID: 0
       firstFrame: 2318
       lastFrame: 2320
       wrapMode: 0
@@ -1954,6 +2135,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_rock_on
       takeName: Take 001
+      internalID: 0
       firstFrame: 2323
       lastFrame: 2353
       wrapMode: 0
@@ -2022,6 +2204,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_swim_breast_stroke
       takeName: Take 001
+      internalID: 0
       firstFrame: 2364
       lastFrame: 2463
       wrapMode: 0
@@ -2090,6 +2273,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_swim_front_crawl
       takeName: Take 001
+      internalID: 0
       firstFrame: 2470
       lastFrame: 2585
       wrapMode: 0
@@ -2158,6 +2342,7 @@ ModelImporter:
     - serializedVersion: 16
       name: hand_pickup_low
       takeName: Take 001
+      internalID: 0
       firstFrame: 0
       lastFrame: 2710
       wrapMode: 0
@@ -2229,32 +2414,52 @@ ModelImporter:
     globalScale: 1
     meshCompression: 0
     addColliders: 0
+    useSRGBMaterialColor: 1
+    sortHierarchyByName: 1
+    importPhysicalCameras: 0
     importVisibility: 1
     importBlendShapes: 0
     importCameras: 0
     importLights: 0
+    nodeNameCollisionStrategy: 0
+    fileIdsGeneration: 1
     swapUVChannels: 0
     generateSecondaryUV: 1
     useFileUnits: 1
-    optimizeMeshForGPU: 1
     keepQuads: 0
     weldVertices: 1
+    bakeAxisConversion: 0
     preserveHierarchy: 0
+    skinWeightsMode: 0
+    maxBonesPerVertex: 4
+    minBoneWeight: 0.001
+    optimizeBones: 1
+    generateMeshLods: 0
+    meshLodGenerationFlags: 0
+    maximumMeshLod: -1
+    meshOptimizationFlags: -1
     indexFormat: 1
     secondaryUVAngleDistortion: 8
     secondaryUVAreaDistortion: 15.000001
     secondaryUVHardAngle: 88
+    secondaryUVMarginMethod: 0
+    secondaryUVMinLightmapResolution: 40
+    secondaryUVMinObjectScale: 1
     secondaryUVPackMargin: 4
     useFileScale: 1
+    strictVertexDataChecks: 0
   tangentSpace:
     normalSmoothAngle: 60
     normalImportMode: 0
     tangentImportMode: 1
     normalCalculationMode: 0
+    legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 1
+    blendShapeNormalImportMode: 1
+    normalSmoothingSource: 0
+  referencedClips: []
   importAnimation: 1
-  copyAvatar: 0
   humanDescription:
-    serializedVersion: 2
+    serializedVersion: 3
     human: []
     skeleton: []
     armTwist: 0.5
@@ -2264,14 +2469,19 @@ ModelImporter:
     armStretch: 0.05
     legStretch: 0.05
     feetSpacing: 0
+    globalScale: 1
     rootMotionBoneName: 
-    rootMotionBoneRotation: {x: 0, y: 0, z: 0, w: 1}
     hasTranslationDoF: 0
     hasExtraRoot: 1
     skeletonHasParents: 0
   lastHumanDescriptionAvatarSource: {instanceID: 0}
+  autoGenerateAvatarMappingIfUnspecified: 1
   animationType: 2
   humanoidOversampling: 1
+  avatarSetup: 1
+  addHumanoidExtraRootOnlyWhenUsingAvatar: 0
+  importBlendShapeDeformPercent: 0
+  remapMaterialsIfMaterialImportModeIsNone: 1
   additionalBone: 0
   userData: 
   assetBundleName: 
