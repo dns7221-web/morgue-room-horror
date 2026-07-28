@@ -10,7 +10,7 @@ using UnityEngine;
 /// </summary>
 public class AnomalyManager : MonoBehaviour
 {
-    [Tooltip("사용할 이상현상들. 씬의 Anomaly 컴포넌트들을 등록.")]
+    [Tooltip("사용할 이상현상들. <b>비워두면</b> 자식에 있는 Anomaly를 전부 자동으로 모은다.")]
     [SerializeField] private Anomaly[] anomalies;
 
     // 현재 발동 중인 이상현상 (없으면 null).
@@ -21,6 +21,15 @@ public class AnomalyManager : MonoBehaviour
 
     /// <summary>현재 발동 중인 이상현상 이름 (디버그/로그용). 없으면 "없음".</summary>
     public string CurrentName => current != null ? current.AnomalyName : "없음";
+
+    private void Awake()
+    {
+        // 배열이 비어 있으면 자식에서 자동 수집한다.
+        // 새 이상현상을 만들고 <b>배열 등록을 잊어</b> 영영 발동하지 않는 사고를 막는다
+        // (컴포넌트는 붙어 있는데 안 나오니 원인을 찾기 특히 어려운 종류의 실수).
+        if (anomalies == null || anomalies.Length == 0)
+            anomalies = GetComponentsInChildren<Anomaly>(true);
+    }
 
     private void Start()
     {
