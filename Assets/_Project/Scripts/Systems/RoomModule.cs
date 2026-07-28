@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -26,14 +27,19 @@ public class RoomModule : MonoBehaviour
     [SerializeField] private Door[] hallwayDoors;
     [Tooltip("옆 모듈과 맞물릴 복도 끝 접합부. forward는 모듈 바깥을 향해야 한다.")]
     [SerializeField] private RoomSocket seamSocket;
-    [Tooltip("게임 시작 시 플레이어가 설 지점 (첫 모듈에서만 사용).")]
+    [Tooltip("루프마다(2번째 판정부터) 플레이어가 서는 지점 — 복도 쪽, 문 밖.")]
     [SerializeField] private Transform startPoint;
+    [Tooltip("게임을 켰을 때 딱 한 번만 쓰는 지점 — 영안실 안쪽, 키패드 앞. 문을 열 필요가 없다.")]
+    [SerializeField] private Transform firstEntryPoint;
 
     /// <summary>옆 모듈이 맞물릴 접합부 Transform.</summary>
     public Transform SeamSocket => seamSocket != null ? seamSocket.transform : null;
 
-    /// <summary>플레이어 시작 지점 (첫 모듈 한정).</summary>
+    /// <summary>루프 재진입 시 플레이어 스폰 지점 (문 밖).</summary>
     public Transform StartPoint => startPoint;
+
+    /// <summary>게임 최초 진입 시 플레이어 스폰 지점 (영안실 안쪽). 없으면 StartPoint로 대체.</summary>
+    public Transform FirstEntryPoint => firstEntryPoint != null ? firstEntryPoint : startPoint;
 
     /// <summary>이번 세팅에서 이 방에 실제로 이상현상이 있는지 (판정 비교용).</summary>
     public bool HasAnomaly { get; private set; }
@@ -58,6 +64,56 @@ public class RoomModule : MonoBehaviour
         foreach (var d in hallwayDoors)
             if (d != null) d.Close();
     }
+
+    /// <summary>복도 문(들)을 '쾅' 닫는다 (방에 들어선 순간 연출).</summary>
+    public void SlamDoors()
+    {
+        foreach (var d in hallwayDoors)
+            if (d != null) d.Slam();
+    }
+
+    /// <summary>복도 문(들)의 잠금을 설정한다. 풀어주면 플레이어가 E로 직접 열 수 있다.</summary>
+    public void SetDoorsLocked(bool locked)
+    {
+        foreach (var d in hallwayDoors)
+            if (d != null) d.SetLocked(locked);
+    }
+
+    /// <summary>
+    /// 복도 문을 <b>뺀</b> 방 안 문들(플레이어가 자유롭게 여닫는 이중문 등)을
+    /// 닫힌 상태로 즉시 되돌린다.
+    ///
+    /// ── 왜 필요한가 ──────────────────────────────────
+    /// 모듈은 몇 개를 돌려쓰므로, 플레이어가 열어둔 문은 그 인스턴스에 그대로 남아
+    /// 다음 차례에 열린 채로 등장한다. 매 루프 <b>똑같은 영안실</b>이어야 이상현상을
+    /// 판별할 수 있는데, 문 상태가 회차마다 다르면 그걸 이상현상으로 오인하게 된다.
+    ///
+    /// 복도 문은 건드리지 않는다 — 그쪽은 GameManager가 따로 관리한다.
+    /// </summary>
+    public void ResetInteriorDoors()
+    {
+        foreach (var d in InteriorDoors)
+            if (d != null) d.SetStateImmediate(false);
+    }
+
+    // 자식에서 자동으로 찾는다(복도 문 제외) — 문을 새로 추가해도 인스펙터 연결이 필요 없다.
+    private Door[] InteriorDoors
+    {
+        get
+        {
+            if (interiorDoors != null) return interiorDoors;
+
+            var all = GetComponentsInChildren<Door>(true);
+            var rest = new List<Door>(all.Length);
+            foreach (var d in all)
+                if (System.Array.IndexOf(hallwayDoors, d) < 0) rest.Add(d);
+
+            interiorDoors = rest.ToArray();
+            return interiorDoors;
+        }
+    }
+
+    private Door[] interiorDoors;
 
     /// <summary>모듈 전체를 켜고 끈다 (컬링 — 비활성 모듈은 렌더링 부담 제거).</summary>
     public void SetVisible(bool on) => gameObject.SetActive(on);

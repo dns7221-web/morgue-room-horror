@@ -43,8 +43,8 @@ public class RoomModulePool : MonoBehaviour
     private int activeIndex;
     private int slotIndex;
 
-    /// <summary>현재 활성(플레이어가 있는) 모듈.</summary>
-    public RoomModule Active => pool[activeIndex];
+    /// <summary>현재 활성(플레이어가 있는) 모듈. Initialize 전에는 null.</summary>
+    public RoomModule Active => pool.Count > 0 ? pool[activeIndex] : null;
 
     /// <summary>풀 생성 + 배치 슬롯 계산 + 첫 모듈 배치. GameManager.Start()에서 1회 호출.</summary>
     public void Initialize()

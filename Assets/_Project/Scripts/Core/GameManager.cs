@@ -45,7 +45,8 @@ public class GameManager : MonoBehaviour
 
     // ── 상태 ──
     private int progress;
-    private bool judged;   // 이번 방을 이미 판정했는지 (중복 방지)
+    private bool judged;            // 이번 방을 이미 판정했는지 (중복 방지)
+    private bool doorwayOccupied;   // 플레이어 몸이 문간(문짝 궤적)에 걸쳐 있는지
 
     public int Progress => progress;
     /// <summary>클리어에 필요한 연속 성공 횟수 (진행도 UI가 "n / 목표" 표시에 사용).</summary>
@@ -53,6 +54,20 @@ public class GameManager : MonoBehaviour
     public bool IsCleared => progress >= clearGoal;
     /// <summary>이번 방을 이미 판정했는지 (키패드가 중복 판정을 막는 데 사용).</summary>
     public bool HasJudged => judged;
+
+    /// <summary>
+    /// 현재 활성 모듈의 루트 Transform. 풀 초기화 전에는 null.
+    /// 씬에 고정으로 놓인 월드 UI가 방을 따라다니는 데 사용 (FollowActiveRoom).
+    /// </summary>
+    public Transform ActiveRoom
+    {
+        get
+        {
+            if (pool == null) return null;
+            var active = pool.Active;
+            return active != null ? active.transform : null;
+        }
+    }
 
     private InputAction judgeYesAction; // O = 있음
     private InputAction judgeNoAction;  // X = 없음
@@ -85,7 +100,7 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         pool.Initialize();   // 모듈 풀 생성 + 배치 슬롯 실측 + 첫 모듈 배치
-        EnterRoom();         // 첫 방도 나머지 루프와 똑같은 방식으로 시작
+        EnterFirstRoom();    // 게임 최초 진입은 루프 재진입과 다르게 취급 (문 밖이 아니라 영안실 안쪽에서 시작)
     }
 
     private void Update()
@@ -117,8 +132,9 @@ public class GameManager : MonoBehaviour
             Debug.Log("[GameManager] 오답! 진행도 0으로 초기화");
         }
 
-        // 정답/오답과 무관하게 복도 문(들)을 열어 다음 루프로 나가게 한다.
-        pool.Active.OpenDoors();
+        // 정답/오답과 무관하게 복도 문(들)의 잠금을 푼다.
+        // 자동으로 열어주지는 않는다 — 나가는 문은 플레이어가 직접 E로 연다.
+        pool.Active.SetDoorsLocked(false);
     }
 
     /// <summary>
@@ -143,17 +159,45 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 새 방 한 판을 준비한다 (게임 시작 / 매 루프 공통).
+    /// 게임을 켰을 때 딱 한 번 호출되는 진입. 루프 재진입(EnterRoom)과 달리
+    /// 플레이어가 이미 영안실 안(키패드 앞)에 있는 것으로 치므로, 문을 열
+    /// 필요도 없고 문 밖으로 스폰시키지도 않는다.
+    /// </summary>
+    private void EnterFirstRoom()
+    {
+        // 첫 방은 랜덤을 돌리지 않고 늘 '정상'으로 고정한다.
+        // 플레이어가 무엇이 정상인지 눈에 익힌 뒤에야 이상현상을 알아볼 수 있기 때문.
+        pool.Active.SetAnomaly(false);
+        Debug.Log($"[GameManager] {pool.Active.name} 세팅 — 첫 방이라 이상현상 없음으로 고정");
+
+        judged = false;
+        doorwayOccupied = false;
+        pool.Active.SetDoorsLocked(true);   // 판정 전까지 복도 문은 잠겨 있다
+
+        var start = pool.Active.FirstEntryPoint;
+        if (teleporter != null && start != null)
+            teleporter.TeleportTo(start.position, start.rotation);
+    }
+
+    /// <summary>
+    /// 새 방 한 판을 준비한다 (루프 재진입 — 판정 후 다음 방으로 넘어갈 때만 호출).
     ///
     /// 문은 닫지 않고 오히려 연다 — 플레이어가 복도(문 밖)에 서게 되므로,
     /// 걸어 들어올 수 있으려면 문이 열려 있어야 한다. 방 안쪽 트리거
-    /// (RoomEntryTrigger)를 지나면 그때 OnPlayerEnteredRoom()이 문을 닫는다.
+    /// (RoomEntryTrigger)를 지나면 그때 OnPlayerEnteredRoom()이 문을 쾅 닫는다.
     /// </summary>
     private void EnterRoom()
     {
+        // 이 모듈을 지난번에 썼을 때 플레이어가 열어둔 문이 남아 있다 — 먼저 되돌린다.
+        // (Dress보다 앞: 나중에 문을 쓰는 이상현상이 생겨도 덮어쓰지 않도록)
+        pool.Active.ResetInteriorDoors();
+
         Dress(pool.Active);
         judged = false;
+        // 옛 모듈 트리거의 점유 상태가 남아 있을 수 있다 (모듈이 꺼지며 Exit을 못 받는 경우).
+        doorwayOccupied = false;
         pool.Active.OpenDoors();
+        pool.Active.SetDoorsLocked(true);   // 열려는 있지만 잠긴 상태 — 들어서면 쾅 닫힌다
 
         var start = pool.Active.StartPoint;
         if (teleporter != null && start != null)
@@ -162,12 +206,29 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// 방 안쪽 트리거(RoomEntryTrigger)에서 호출: 플레이어가 문을 지나
-    /// 방 안으로 확실히 들어왔으므로 문을 닫는다 (판정해야 다시 열림).
+    /// 방 안으로 확실히 들어왔다.
+    ///
+    /// 등 뒤에서 문이 '쾅' 닫히고 다시 잠긴다 — 판정을 끝내야 잠금이 풀린다.
+    /// (첫 방은 애초에 문이 닫힌 채로 시작하므로 이 트리거를 탈 일이 없다)
     /// </summary>
     public void OnPlayerEnteredRoom()
     {
-        pool.Active.CloseDoors();
+        // 판정을 끝낸 뒤라면 지금은 '들어오는' 게 아니라 복도로 '나가는' 길이다.
+        if (judged) return;
+
+        // 문간에 몸이 걸쳐 있으면 절대 닫지 않는다 — 문짝에 밀려나기 때문.
+        // (정상 흐름에선 문간을 빠져나온 뒤 호출되므로 여기 걸릴 일이 없다. 안전장치)
+        if (doorwayOccupied) return;
+
+        pool.Active.SlamDoors();
+        pool.Active.SetDoorsLocked(true);
     }
+
+    /// <summary>
+    /// 문간 볼륨(RoomEntryTrigger) 점유 상태 갱신.
+    /// 점유 중에는 어떤 경로로도 복도 문을 닫지 않는다 — 문짝이 플레이어를 밀어내지 않게.
+    /// </summary>
+    public void SetDoorwayOccupied(bool occupied) => doorwayOccupied = occupied;
 
     /// <summary>지정 모듈에 이상현상 유무를 랜덤 세팅한다 (방 '새로 꾸미기').</summary>
     private void Dress(RoomModule module)
