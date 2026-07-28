@@ -1936,6 +1936,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1816457897}
   - component: {fileID: 1816457896}
+  - component: {fileID: 1816457898}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -1960,6 +1961,7 @@ MonoBehaviour:
   screenFader: {fileID: 1002458130}
   clearGoal: 8
   anomalyChance: 0.5
+  mistakesBeforeStalker: 3
   enableTestKeys: 0
 --- !u!4 &1816457897
 Transform:
@@ -1976,6 +1978,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1816457898
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1816457895}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c82627097b00f44c8beca1258dc97e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugPanel
+  debugMode: 1
+  showOverlay: 1
+  correctKey: 94
+  wrongKey: 95
+  nextRoomKey: 96
+  stalkerKey: 97
 --- !u!1 &1994007104
 GameObject:
   m_ObjectHideFlags: 0
@@ -2009,6 +2029,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FirstPersonController
   moveSpeed: 2.5
+  backwardSpeedMultiplier: 0.4
   gravity: -9.81
   cameraPivot: {fileID: 330585546}
   lookSensitivity: 0.1
