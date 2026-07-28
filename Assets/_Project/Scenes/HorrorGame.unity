@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 116021102}
   - component: {fileID: 116021101}
   - component: {fileID: 116021100}
+  - component: {fileID: 116021104}
   m_Layer: 5
   m_Name: ScoreCan
   m_TagString: Untagged
@@ -221,6 +222,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0.401, y: 1.198}
   m_SizeDelta: {x: 1, y: 1}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &116021104
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 116021099}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe78392ae46474b4889c5fc0b17c0eac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FollowActiveRoom
 --- !u!4 &135458019 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4934425983391860, guid: 011fc785b2faeba4c8b26a498f821ba3, type: 3}
