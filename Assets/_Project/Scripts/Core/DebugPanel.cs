@@ -104,8 +104,9 @@ public class DebugPanel : MonoBehaviour
             stalkerWarning;
 
         // 글자가 배경에 묻히지 않게 어두운 판을 깔아준다.
-        float height = stalkerWarning == "" ? 94f : 114f;
-        GUI.Box(new Rect(8, 8, 560, height), GUIContent.none);
-        GUI.Label(new Rect(16, 12, 550, height), text, style);
+        // 추격자 줄이 두 줄이라 그만큼 더 잡는다.
+        float height = stalkerWarning == "" ? 112f : 132f;
+        GUI.Box(new Rect(8, 8, 620, height), GUIContent.none);
+        GUI.Label(new Rect(16, 12, 610, height), text, style);
     }
 }
