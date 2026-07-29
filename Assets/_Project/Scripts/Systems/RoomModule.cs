@@ -97,18 +97,25 @@ public class RoomModule : MonoBehaviour
         if (anomalyManager != null) anomalyManager.SetAnomaly(has);
     }
 
-    /// <summary>복도 문(들)을 연다.</summary>
-    public void OpenDoors()
+    /// <summary>
+    /// 복도 문(들)을 <b>애니메이션 없이 즉시</b> 지정 상태로 만든다.
+    ///
+    /// ── 왜 Open()/Close()가 아니라 즉시인가 ──────────────
+    /// 이 호출은 <b>암전 중</b>에 일어난다. Open()은 1초에 걸쳐 스르륵 여는데
+    /// 화면은 0.7초면 다 밝아지므로, 남은 시간만큼 <b>문이 저절로 움직이는 장면</b>이
+    /// 플레이어에게 보인다. "새 방에 도착했다"가 아니라 "누가 문을 만지고 있다"가 된다.
+    ///
+    /// 게다가 Open()/Close()는 이미 그 상태인 문을 <b>그냥 통과시킨다</b>(isOpen 검사).
+    /// 그래서 플레이어가 한쪽만 열어뒀다면 한쪽은 가만히 있고 반대쪽만 눈앞에서
+    /// 움직이는 짝짝이가 되어, <b>같은 방을 돌려쓴다는 사실이 그대로 드러난다.</b>
+    ///
+    /// 안쪽 문(ResetInteriorDoors)이 이미 같은 이유로 즉시 처리를 쓴다 —
+    /// 같은 상황이므로 같은 방식으로 푼다.
+    /// </summary>
+    public void SetDoorsImmediate(bool open)
     {
         foreach (var d in hallwayDoors)
-            if (d != null) d.Open();
-    }
-
-    /// <summary>복도 문(들)을 닫는다.</summary>
-    public void CloseDoors()
-    {
-        foreach (var d in hallwayDoors)
-            if (d != null) d.Close();
+            if (d != null) d.SetStateImmediate(open);
     }
 
     /// <summary>복도 문(들)을 '쾅' 닫는다 (방에 들어선 순간 연출).</summary>
