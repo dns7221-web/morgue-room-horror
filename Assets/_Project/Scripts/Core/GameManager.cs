@@ -34,6 +34,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private ScreenFader screenFader;
     [Tooltip("오답 순간 잠깐 번쩍이는 그림. 비워도 동작에는 지장 없다(연출만 빠짐).")]
     [SerializeField] private ScareFlash wrongAnswerFlash;
+    [Tooltip("클리어 화면. 목표 달성 후 복도로 나서면 나타난다. 씬에서는 꺼둘 것.")]
+    [SerializeField] private GameObject clearScreen;
 
     [Header("Rules")]
     [Tooltip("이 횟수만큼 연속 성공하면 클리어.")]
@@ -169,7 +171,10 @@ public class GameManager : MonoBehaviour
         {
             progress++;
             Debug.Log($"[GameManager] 정답! 진행도 {progress}/{clearGoal}");
-            if (IsCleared) { OnClear(); return; }
+
+            // ⚠ 여기서 return하면 안 된다. 아래 문 잠금 해제를 건너뛰어
+            // <b>클리어한 플레이어가 방에 갇힌다</b> — 이겼는데 못 나가는 상태.
+            if (IsCleared) OnClear();
         }
         else
         {
@@ -198,8 +203,27 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void AdvanceToNextRoom()
     {
+        // 클리어했다면 다음 방은 없다 — 복도로 나선 이 순간이 끝이다.
+        if (IsCleared) { ShowClearScreen(); return; }
+
         if (screenFader != null) screenFader.FadeThrough(DoAdvance);
         else DoAdvance();
+    }
+
+    /// <summary>
+    /// 클리어 화면을 띄운다.
+    ///
+    /// 방을 넘길 때 쓰던 페이더를 <b>그대로</b> 재사용한다 — 암전이 걷히면서
+    /// 화면이 드러나므로, 툭 튀어나오는 것보다 "끝났다"가 분명해진다.
+    /// 지금껏 암전 뒤에는 늘 <b>또 그 방</b>이 있었으니, 같은 암전 뒤에 다른 것이
+    /// 나오는 것 자체가 신호가 된다.
+    /// </summary>
+    private void ShowClearScreen()
+    {
+        if (clearScreen == null || clearScreen.activeSelf) return;
+
+        if (screenFader != null) screenFader.FadeThrough(() => clearScreen.SetActive(true));
+        else clearScreen.SetActive(true);
     }
 
     /// <summary>
@@ -237,9 +261,16 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// 새 방 한 판을 준비한다 (루프 재진입 — 판정 후 다음 방으로 넘어갈 때만 호출).
     ///
-    /// 문은 닫지 않고 오히려 연다 — 플레이어가 복도(문 밖)에 서게 되므로,
-    /// 걸어 들어올 수 있으려면 문이 열려 있어야 한다. 방 안쪽 트리거
-    /// (RoomEntryTrigger)를 지나면 그때 OnPlayerEnteredRoom()이 문을 쾅 닫는다.
+    /// ── 문은 닫아두고 잠금만 푼다 ────────────────────────
+    /// 플레이어는 복도(문 밖)에 서게 되고, <b>직접 E로 열고 들어와야</b> 한다.
+    /// 나갈 때도 직접 여니 들어올 때도 같게 해서 규칙을 하나로 통일했다.
+    ///
+    /// 열어둔 채로 시작하지 않는 이유는 <b>상태를 하나로 고정</b>하기 위해서다.
+    /// 열어두면 플레이어가 지난 회차에 어느 쪽 문을 열었느냐에 따라 짝짝이가 되고,
+    /// 그 차이가 <b>같은 방을 돌려쓴다는 단서</b>가 된다. 늘 '닫힘'이면 단서가 없다.
+    ///
+    /// 방 안쪽 트리거(RoomEntryTrigger)를 지나면 OnPlayerEnteredRoom()이
+    /// 등 뒤에서 문을 쾅 닫고 다시 잠근다.
     /// </summary>
     private void EnterRoom()
     {
@@ -256,8 +287,11 @@ public class GameManager : MonoBehaviour
         judged = false;
         // 옛 모듈 트리거의 점유 상태가 남아 있을 수 있다 (모듈이 꺼지며 Exit을 못 받는 경우).
         doorwayOccupied = false;
-        pool.Active.OpenDoors();
-        pool.Active.SetDoorsLocked(true);   // 열려는 있지만 잠긴 상태 — 들어서면 쾅 닫힌다
+        // 문은 <b>닫힌 채로</b> 시작하고, 잠금은 풀어둔다.
+        // 플레이어가 직접 E로 열고 들어와야 한다 — 나갈 때와 같은 규칙이다.
+        // (잠근 채로 닫아두면 복도에 갇힌다)
+        pool.Active.SetDoorsImmediate(false);
+        pool.Active.SetDoorsLocked(false);
 
         var start = pool.Active.StartPoint;
         if (teleporter != null && start != null)
@@ -325,9 +359,13 @@ public class GameManager : MonoBehaviour
         Debug.Log($"[GameManager] {module.name} 세팅 — 이상현상: {(has ? "있음" : "없음")}");
     }
 
+    /// <summary>
+    /// 목표 달성 순간. 여기서 화면을 띄우지는 <b>않는다</b> — 판정 직후는 아직
+    /// 영안실 안이라, 끝을 알리기 전에 <b>제 발로 걸어 나가게</b> 두는 편이 낫다.
+    /// 실제 클리어 화면은 복도 트리거를 지날 때 ShowClearScreen()이 띄운다.
+    /// </summary>
     private void OnClear()
     {
-        Debug.Log("[GameManager] 클리어! 🎉");
-        // 나중: 클리어 연출/엔딩 화면
+        Debug.Log("[GameManager] 클리어! 🎉 — 복도로 나서면 끝난다");
     }
 }
