@@ -32,6 +32,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PlayerTeleporter teleporter;
     [Tooltip("복도 통과 시 화면을 검게 페이드해 건물 이동을 가리는 연출. 비우면 즉시 스왑(디버그용).")]
     [SerializeField] private ScreenFader screenFader;
+    [Tooltip("오답 순간 잠깐 번쩍이는 그림. 비워도 동작에는 지장 없다(연출만 빠짐).")]
+    [SerializeField] private ScareFlash wrongAnswerFlash;
 
     [Header("Rules")]
     [Tooltip("이 횟수만큼 연속 성공하면 클리어.")]
@@ -174,6 +176,10 @@ public class GameManager : MonoBehaviour
             progress = 0;
             mistakes++;
             Debug.Log($"[GameManager] 오답! 진행도 0으로 초기화 (누적 오답 {mistakes})");
+
+            // 진행도만 조용히 0이 되면 틀린 게 아프지 않다. 벌은 이미 줬으니
+            // 더 뺏는 대신 놀라게 해서 '틀렸다'를 감각으로 남긴다.
+            if (wrongAnswerFlash != null) wrongAnswerFlash.Flash();
 
             // 기준에 닿았으면 '그것'이 다음 방의 이상현상이 된다 (Dress에서 처리).
             if (mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
