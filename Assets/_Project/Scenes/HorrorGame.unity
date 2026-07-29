@@ -1128,7 +1128,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScareFlash
   fadeInDuration: 0
-  holdDuration: 0.12
+  holdDuration: 0.08
   fadeOutDuration: 0.18
 --- !u!225 &816737366
 CanvasGroup:
