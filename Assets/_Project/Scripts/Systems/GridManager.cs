@@ -50,6 +50,32 @@ public class GridManager : MonoBehaviour
     /// <summary>플레이어가 지금 서 있는 칸. 아직 초기화 전이면 null.</summary>
     public GridCell CenterCell => cells.TryGetValue(CenterCoord, out var c) ? c : null;
 
+    /// <summary>지금 격자에 놓인 칸들 (좌표 → 칸). 표시판이 읽어간다 — 쓰기는 격자만 한다.</summary>
+    public IReadOnlyDictionary<Vector2Int, GridCell> Cells => cells;
+
+    /// <summary>
+    /// <see cref="MeasureSpacing"/>이 실측한 칸 간격 (x, z). 곧 칸 하나가 차지해도 되는
+    /// 크기이기도 해서, 표시판이 "지오메트리가 이 몫을 넘지 않는가"를 검사하는 데 쓴다.
+    /// </summary>
+    public Vector2 Spacing => grid != null ? new Vector2(grid.cellSize.x, grid.cellSize.z) : Vector2.zero;
+
+    /// <summary>
+    /// 마지막 재활용 기록 — 표시판이 "방금 무슨 일이 있었나"를 보여주기 위한 것.
+    ///
+    /// 재활용은 <b>보이면 안 되는</b> 사건이라, 정상 동작일수록 화면에 아무 일도 일어나지
+    /// 않는다. 그래서 일어났는지 여부 자체를 눈으로 확인할 방법이 따로 있어야 한다.
+    /// </summary>
+    public struct RecycleRecord
+    {
+        public Vector2Int direction;   // 진행 방향
+        public Vector2Int from;        // 옮기기 전 행/열의 대표 좌표
+        public Vector2Int to;          // 옮긴 뒤 대표 좌표
+        public float time;             // Time.time
+    }
+
+    /// <summary>마지막 재활용 기록. 아직 한 번도 없었으면 direction이 zero.</summary>
+    public RecycleRecord LastRecycle { get; private set; }
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -153,6 +179,14 @@ public class GridManager : MonoBehaviour
     {
         Vector2Int perp = new(-dir.y, dir.x);
         Vector2Int edgeBase = CenterCoord - dir * 2; // 새 중앙 기준 뒤처진 행/열의 대표 좌표
+
+        LastRecycle = new RecycleRecord
+        {
+            direction = dir,
+            from = edgeBase,
+            to = edgeBase + dir * 3,
+            time = Time.time,
+        };
 
         for (int i = -1; i <= 1; i++)
         {
