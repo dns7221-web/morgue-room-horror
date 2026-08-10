@@ -29,7 +29,11 @@ using UnityEngine;
 ///   • 돌아본다          → 멈춰 세우지만 내 발도 느려진다
 ///
 /// ── 배치 ──────────────────────────────────────────────
-/// 방 모듈 프리팹 자식. <b>로직용 루트 / 아트용 자식</b>으로 나눈다.
+/// 씬 단일 존재(풀링되지 않음). 모듈이 몇 개 켜지든 그것은 한 마리여야 하므로,
+/// 특정 방 모듈의 자식이 아니라 씬 루트에 고정으로 둔다. 어느 방에 세울지는
+/// 매번 <see cref="Appear"/>에 그 방의 스폰 지점을 넘겨서 정한다.
+///
+/// <b>로직용 루트 / 아트용 자식</b>으로 나눈다.
 ///
 ///   Stalker        ← 이 스크립트. 무회전, 피벗은 발바닥. 회전을 덮어써도 안전
 ///   └── Model      ← 시체 메시. 세우는 보정(z 90°)을 여기가 들고 있는다
@@ -52,10 +56,6 @@ public class Stalker : MonoBehaviour
     [Tooltip("벽에 가렸는지 검사할 표본점들(머리·어깨·중심 등). 많을수록 정확하다.")]
     [SerializeField] private Transform[] samplePoints;
 
-    [Header("등장")]
-    [Tooltip("등장 위치. 비우면 이 오브젝트의 처음 자리에서 나타난다.")]
-    [SerializeField] private Transform spawnPoint;
-
     [Header("행동")]
     [Tooltip("다가오는 속도(m/s). 플레이어(기본 2.5)보다 빨라야 긴장이 생긴다.")]
     [SerializeField] private float moveSpeed = 3.2f;
@@ -71,8 +71,6 @@ public class Stalker : MonoBehaviour
     private CharacterController controller;
     private Camera eye;
     private Transform player;
-    private Vector3 startLocalPosition;
-    private Quaternion startLocalRotation;
     private bool active;
 
     // [디버그] 마지막 프레임의 시야 판정 결과. '쳐다봤는데 안 멈춘다'가
@@ -119,15 +117,6 @@ public class Stalker : MonoBehaviour
 
     private void Awake()
     {
-        // 등장 자리를 로컬로 기억한다 — 건물이 슬롯을 옮겨도 유효하도록.
-        // (월드로 저장하면 건물 이동 후 옛 자리에 나타난다)
-        //
-        // ⚠ 반드시 <b>자기 자신의</b> 로컬 값을 뜬다. spawnPoint의 로컬 값을 읽으면
-        // 둘의 부모가 다를 때 좌표계가 어긋난다. spawnPoint가 있으면 등장할 때
-        // 월드 자세를 직접 읽으므로(MoveToSpawn) 여기 값은 그때의 예비용이다.
-        startLocalPosition = transform.localPosition;
-        startLocalRotation = transform.localRotation;
-
         controller = GetComponent<CharacterController>();
 
         SetBodyVisible(false);
@@ -154,10 +143,15 @@ public class Stalker : MonoBehaviour
             if (r != null) r.enabled = visible;
     }
 
-    /// <summary>등장시킨다. 등장 자리로 돌려놓고 몸을 켠다.</summary>
-    public void Appear()
+    /// <summary>
+    /// 등장시킨다. <paramref name="spawnPoint"/> 위치로 옮기고 몸을 켠다.
+    ///
+    /// 씬 단일 존재라 어느 방에 세울지 스스로는 모른다 — 호출하는 쪽(GameManager)이
+    /// 그 방의 스폰 지점(RoomModule.StalkerSpawnPoint)을 매번 넘겨준다.
+    /// </summary>
+    public void Appear(Transform spawnPoint)
     {
-        MoveToSpawn();
+        MoveToSpawn(spawnPoint);
 
         SetBodyVisible(true);
         active = true;
@@ -166,39 +160,37 @@ public class Stalker : MonoBehaviour
         Debug.Log($"[Stalker] 등장 — 월드 위치 {transform.position}, {DebugState}", this);
     }
 
-    /// <summary>물러가게 한다 (방이 바뀔 때 등).</summary>
+    /// <summary>물러가게 한다 (방이 바뀔 때 등). 비활성 상태라 위치는 상관없어 그대로 둔다.</summary>
     public void Vanish()
     {
         active = false;
         SetBodyVisible(false);
-        MoveToSpawn();
     }
 
     /// <summary>
-    /// 등장 자리로 되돌린다.
+    /// 지정한 스폰 지점으로 옮긴다.
     ///
     /// ── 함정: 기준점의 '로컬' 좌표를 그대로 복사하면 안 된다 ──────
     /// spawnPoint와 이 오브젝트의 <b>부모가 다르면</b> 로컬 좌표계가 서로 달라,
     /// 복사한 값이 부모 오프셋만큼 어긋난 자리로 간다. 회전도 같이 덮인다.
     ///
-    /// spawnPoint는 이 모듈 안에 있고 이 함수는 모듈 배치가 끝난 뒤에 호출되므로,
-    /// 지금 읽는 <b>월드</b> 자세는 언제나 정답이다 (TransformAnomaly와 같은 이유).
+    /// 그래서 <b>월드</b> 자세를 읽어 옮긴다 (TransformAnomaly와 같은 이유) — 이
+    /// 오브젝트는 씬 루트에 고정이고 spawnPoint는 활성 모듈 안에 있어 둘의 부모가
+    /// 다르므로, 로컬 좌표 복사는 애초에 성립하지 않는다.
     /// </summary>
-    private void MoveToSpawn()
+    private void MoveToSpawn(Transform spawnPoint)
     {
+        if (spawnPoint == null)
+        {
+            Debug.LogError("[Stalker] spawnPoint가 비어 있어 등장 위치를 정할 수 없습니다.", this);
+            return;
+        }
+
         // CharacterController는 자기 위치를 스스로 관리해서, 켜진 채로 transform을
         // 바꾸면 무시되거나 충돌로 튕긴다. 순간이동 순간에만 잠깐 끈다.
         // (PlayerTeleporter가 쓰는 것과 같은 처리 — 같은 문제라 같은 방식으로 푼다)
         controller.enabled = false;
-
-        if (spawnPoint != null)
-            transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
-        else
-        {
-            transform.localPosition = startLocalPosition;
-            transform.localRotation = startLocalRotation;
-        }
-
+        transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
         controller.enabled = true;
     }
 

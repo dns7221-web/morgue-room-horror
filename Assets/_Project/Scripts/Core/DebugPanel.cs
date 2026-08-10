@@ -10,7 +10,7 @@ using UnityEngine.InputSystem;
 /// 확인 한 번에 몇 분씩 걸린다. 그 반복을 없애는 것이 목적이다.
 ///
 /// 화면 표시판은 <b>연결 누락</b>을 바로 드러내는 역할도 한다. 실제로
-/// RoomModule의 Stalker 슬롯이 비어 "정답은 있음인데 화면엔 아무것도 없는"
+/// GameManager의 Stalker 슬롯이 비어 "정답은 있음인데 화면엔 아무것도 없는"
 /// 상태를 한참 뒤에야 발견한 적이 있어, 그런 종류의 사고를 눈에 띄게 만든다.
 ///
 /// 배치: 씬 아무 오브젝트에나 붙인다 (GameManager와 같은 곳이 편하다).
@@ -85,14 +85,14 @@ public class DebugPanel : MonoBehaviour
         string answer = gm.CurrentRoomHasAnomaly ? "O(있음)" : "X(없음)";
 
         // 연결 누락은 눈에 띄게 — 이것 때문에 '있음인데 아무것도 안 보이는' 사고가 난다.
-        string stalkerWarning = (room != null && !room.HasStalkerReference)
-            ? "\n<color=#ff5555>⚠ RoomModule의 Stalker 슬롯 비어 있음</color>"
+        string stalkerWarning = gm.Stalker == null
+            ? "\n<color=#ff5555>⚠ GameManager의 Stalker 슬롯 비어 있음</color>"
             : "";
 
         // 추격자가 '있다는데 안 보이는' 상황을 추적하기 위한 줄.
         // 위치 y가 바닥 아래거나 렌더러가 0/N이면 원인이 바로 드러난다.
-        string stalkerState = (room != null && room.Stalker != null)
-            ? room.Stalker.DebugState
+        string stalkerState = gm.Stalker != null
+            ? gm.Stalker.DebugState
             : "-";
 
         string text =

@@ -31,7 +31,6 @@ Transform:
   m_Children:
   - {fileID: 2467393606039860475}
   - {fileID: 8268781411247633678}
-  - {fileID: 6440373515436517915}
   - {fileID: 5808374046544698524}
   m_Father: {fileID: 4674546426808105313}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -184,7 +183,7 @@ MonoBehaviour:
   seamSocket: {fileID: 8688255239707891720}
   startPoint: {fileID: 5297307058620120008}
   firstEntryPoint: {fileID: 7349216580324719002}
-  stalker: {fileID: 4835242129165270051}
+  stalkerSpawnPoint: {fileID: 7279824378512113059}
 --- !u!1 &4495738896707855846
 GameObject:
   m_ObjectHideFlags: 0
@@ -794,95 +793,6 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 330303525549549400, guid: 87986c50050897f4480afbacc0cca53e, type: 3}
   m_PrefabInstance: {fileID: 2785626070704182179}
-  m_PrefabAsset: {fileID: 0}
---- !u!1001 &4754129845318052666
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 8485853447871020225}
-    m_Modifications:
-    - target: {fileID: 207223851634251545, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: spawnPoint
-      value: 
-      objectReference: {fileID: 7279824378512113059}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1866291151655476324, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_Name
-      value: Stalker
-      objectReference: {fileID: 0}
-    - target: {fileID: 1866291151655476324, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_Layer
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 3546869821062424017, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_Radius
-      value: 0.3
-      objectReference: {fileID: 0}
-    - target: {fileID: 3546869821062424017, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-      propertyPath: m_Center.y
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
---- !u!114 &4835242129165270051 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 207223851634251545, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-  m_PrefabInstance: {fileID: 4754129845318052666}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 62c8998d78a4b3d4a92419f8e7e1d39e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Stalker
---- !u!4 &6440373515436517915 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 1772943194417168673, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
-  m_PrefabInstance: {fileID: 4754129845318052666}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &5010379240547654878
 PrefabInstance:

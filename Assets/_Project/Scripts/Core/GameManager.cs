@@ -36,6 +36,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private ScareFlash wrongAnswerFlash;
     [Tooltip("클리어 화면. 목표 달성 후 복도로 나서면 나타난다. 씬에서는 꺼둘 것.")]
     [SerializeField] private GameObject clearScreen;
+    [Tooltip("씬 단일 추격자. 모듈이 몇 개 켜지든 이 한 마리만 존재한다 — 어느 방에 세울지는 그때그때 RoomModule.StalkerSpawnPoint를 넘겨 지시한다.")]
+    [SerializeField] private Stalker stalker;
 
     [Header("Rules")]
     [Tooltip("이 횟수만큼 연속 성공하면 클리어.")]
@@ -93,13 +95,39 @@ public class GameManager : MonoBehaviour
     /// <summary>현재 활성 모듈 (디버그 표시용).</summary>
     public RoomModule CurrentRoom => pool != null ? pool.Active : null;
 
+    /// <summary>씬 단일 추격자 (디버그 표시용).</summary>
+    public Stalker Stalker => stalker;
+
     /// <summary>[디버그] 이번 방의 이상현상을 즉시 '그것'으로 바꾼다.</summary>
     public void DebugMakeStalkerAnomaly()
     {
         if (pool == null || pool.Active == null) return;
-        pool.Active.SetStalkerAsAnomaly();
+        SetStalkerAsAnomaly(pool.Active);
         judged = false;
         Debug.Log("[Debug] 이번 방 이상현상을 '그것'으로 교체");
+    }
+
+    /// <summary>
+    /// 이 방을 '그것' 방으로 세팅하고, 씬 단일 추격자를 그 방의 스폰 지점에 등장시킨다.
+    /// 방 데이터 세팅과 물리적 등장을 한 곳에서 묶어, 한쪽만 호출해 생기는
+    /// "정답은 있음인데 화면엔 아무것도 없는" 사고를 막는다.
+    /// </summary>
+    private void SetStalkerAsAnomaly(RoomModule module)
+    {
+        module.SetStalkerAsAnomaly();
+
+        if (stalker == null)
+        {
+            Debug.LogWarning("[GameManager] Stalker가 연결돼 있지 않아 '있음'인데 아무것도 나타나지 않습니다.", this);
+            return;
+        }
+        stalker.Appear(module.StalkerSpawnPoint);
+    }
+
+    /// <summary>씬 단일 추격자를 물린다.</summary>
+    private void DismissStalker()
+    {
+        if (stalker != null) stalker.Vanish();
     }
 
     /// <summary>
@@ -250,7 +278,7 @@ public class GameManager : MonoBehaviour
 
         judged = false;
         doorwayOccupied = false;
-        pool.Active.DismissStalker();
+        DismissStalker();
         pool.Active.SetDoorsLocked(true);   // 판정 전까지 복도 문은 잠겨 있다
 
         var start = pool.Active.FirstEntryPoint;
@@ -281,7 +309,7 @@ public class GameManager : MonoBehaviour
         // ⚠ 순서 주의: 반드시 Dress보다 <b>먼저</b> 물려야 한다.
         // Dress가 '그것'을 이번 방의 이상현상으로 세울 수 있는데, 뒤에서 물리면
         // 방금 세운 추격자를 그대로 지워버린다.
-        pool.Active.DismissStalker();
+        DismissStalker();
 
         Dress(pool.Active);
         judged = false;
@@ -349,7 +377,7 @@ public class GameManager : MonoBehaviour
         if (mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
         {
             mistakes = 0;
-            module.SetStalkerAsAnomaly();
+            SetStalkerAsAnomaly(module);
             Debug.Log($"[GameManager] {module.name} 세팅 — 이상현상: 그것 (관찰해서 O로 판정할 것)");
             return;
         }

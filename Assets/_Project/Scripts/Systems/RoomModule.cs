@@ -31,8 +31,8 @@ public class RoomModule : MonoBehaviour
     [SerializeField] private Transform startPoint;
     [Tooltip("게임을 켰을 때 딱 한 번만 쓰는 지점 — 영안실 안쪽, 키패드 앞. 문을 열 필요가 없다.")]
     [SerializeField] private Transform firstEntryPoint;
-    [Tooltip("이 모듈 소속 추격자. 비워두면 추격자 없이 동작한다.")]
-    [SerializeField] private Stalker stalker;
+    [Tooltip("이 방에서 '그것'이 서는 자리. Stalker는 씬 단일 존재라 이 모듈이 직접 소유하지 않고, 자리(Transform)만 들고 있는다.")]
+    [SerializeField] private Transform stalkerSpawnPoint;
 
     /// <summary>옆 모듈이 맞물릴 접합부 Transform.</summary>
     public Transform SeamSocket => seamSocket != null ? seamSocket.transform : null;
@@ -47,20 +47,18 @@ public class RoomModule : MonoBehaviour
     public bool HasAnomaly { get; private set; }
 
     /// <summary>
-    /// 이번 방의 이상현상을 <b>'그것'으로 고정</b>한다.
+    /// 이번 방의 이상현상을 <b>'그것'으로 고정</b>한다 (방 데이터만 — 물리적 등장은
+    /// GameManager가 <see cref="StalkerSpawnPoint"/>를 받아 씬 단일 Stalker에 지시한다).
     ///
-    /// 랜덤 변형(시체 소실·이동·증가·서랍)은 전부 정상으로 되돌리고, 대신 영안실에
-    /// 추격자를 세운다. 정답은 O(있음) — 플레이어는 <b>관찰로 발견해야</b> 한다.
-    /// 등 뒤에서 튀어나오는 게 아니라 처음부터 거기 서 있는 것이 핵심이다.
+    /// 랜덤 변형(시체 소실·이동·증가·서랍)은 전부 정상으로 되돌린다. 정답은 O(있음) —
+    /// 플레이어는 <b>관찰로 발견해야</b> 한다. 등 뒤에서 튀어나오는 게 아니라 처음부터
+    /// 거기 서 있는 것이 핵심이다.
     /// </summary>
     public void SetStalkerAsAnomaly()
     {
         HasAnomaly = true;
         StalkerIsAnomaly = true;
         if (anomalyManager != null) anomalyManager.SetAnomaly(false);   // 다른 변형은 정상 복원
-
-        if (stalker != null) stalker.Appear();
-        else Debug.LogWarning($"[RoomModule] {name}: Stalker가 연결돼 있지 않아 '있음'인데 아무것도 나타나지 않습니다.", this);
     }
 
     /// <summary>이번 방의 이상현상이 '그것'인지 (디버그 표시용).</summary>
@@ -77,17 +75,8 @@ public class RoomModule : MonoBehaviour
         }
     }
 
-    /// <summary>Stalker 참조가 연결돼 있는지 (디버그 점검용).</summary>
-    public bool HasStalkerReference => stalker != null;
-
-    /// <summary>이 방의 추격자 (디버그 표시용).</summary>
-    public Stalker Stalker => stalker;
-
-    /// <summary>추격자를 물리고 등장 자리로 되돌린다.</summary>
-    public void DismissStalker()
-    {
-        if (stalker != null) stalker.Vanish();
-    }
+    /// <summary>이 방에서 '그것'이 서는 자리 (GameManager가 Stalker.Appear()에 넘긴다).</summary>
+    public Transform StalkerSpawnPoint => stalkerSpawnPoint;
 
     /// <summary>이상현상 유무를 세팅한다. 실제 발동/복원은 AnomalyManager가 담당.</summary>
     public void SetAnomaly(bool has)

@@ -181,7 +181,6 @@ MonoBehaviour:
   - {fileID: 8440023093522664783}
   - {fileID: 2656296080679328372}
   - {fileID: 4931924924300684405}
-  spawnPoint: {fileID: 0}
   moveSpeed: 3.2
   catchDistance: 1.3
   occluders:
@@ -212,7 +211,7 @@ CharacterController:
   m_StepOffset: 0.3
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!1 &4744749129836539654
 GameObject:
   m_ObjectHideFlags: 0

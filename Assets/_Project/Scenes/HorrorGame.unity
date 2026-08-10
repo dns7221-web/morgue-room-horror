@@ -2403,6 +2403,7 @@ MonoBehaviour:
   screenFader: {fileID: 1002458130}
   wrongAnswerFlash: {fileID: 816737365}
   clearScreen: {fileID: 933954953}
+  stalker: {fileID: 207223851634251545, guid: b709ccbf658ca4c47b7a5e79e23f54be, type: 3}
   clearGoal: 8
   anomalyChance: 0.5
   mistakesBeforeStalker: 3
