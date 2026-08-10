@@ -95,6 +95,9 @@ public class GameManager : MonoBehaviour
     /// <summary>현재 활성 모듈 (디버그 표시용).</summary>
     public RoomModule CurrentRoom => pool != null ? pool.Active : null;
 
+    /// <summary>지금 화면에 켜져 있는 모듈 개수 (디버그 검증용). 3안 구조에서는 언제나 1이 정상.</summary>
+    public int ActiveModuleCount => pool != null ? pool.ActiveModuleCount : 0;
+
     /// <summary>씬 단일 추격자 (디버그 표시용).</summary>
     public Stalker Stalker => stalker;
 

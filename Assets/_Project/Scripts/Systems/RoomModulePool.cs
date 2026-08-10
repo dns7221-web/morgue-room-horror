@@ -46,6 +46,25 @@ public class RoomModulePool : MonoBehaviour
     /// <summary>현재 활성(플레이어가 있는) 모듈. Initialize 전에는 null.</summary>
     public RoomModule Active => pool.Count > 0 ? pool[activeIndex] : null;
 
+    /// <summary>
+    /// 지금 SetActive(true)로 화면에 켜져 있는 모듈 개수 (디버그 검증용).
+    ///
+    /// 3안(암전 순간이동) 구조에서는 언제나 1이어야 정상이다 — "화면에 존재하는
+    /// 건물은 언제나 하나뿐"이 이 설계의 핵심 제약이기 때문. 5안(코너 심리스)에
+    /// 들어가 두 모듈을 동시에 이어붙이면 이 값이 2로 바뀌는 순간을 눈으로 볼 수
+    /// 있어야, 그 전환이 의도대로 일어나는지 확인할 수 있다.
+    /// </summary>
+    public int ActiveModuleCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var m in pool)
+                if (m != null && m.gameObject.activeSelf) count++;
+            return count;
+        }
+    }
+
     /// <summary>풀 생성 + 배치 슬롯 계산 + 첫 모듈 배치. GameManager.Start()에서 1회 호출.</summary>
     public void Initialize()
     {

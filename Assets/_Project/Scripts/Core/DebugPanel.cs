@@ -84,6 +84,13 @@ public class DebugPanel : MonoBehaviour
         string anomaly = room != null ? room.AnomalyLabel : "-";
         string answer = gm.CurrentRoomHasAnomaly ? "O(있음)" : "X(없음)";
 
+        // 5안(코너 심리스) 검증용 — 모듈이 2개 켜지는 순간, 추격자가 둘이 되는
+        // 순간을 눈으로 봐야 한다. 3안 구조에서는 둘 다 언제나 1이 정상.
+        int activeModules = gm.ActiveModuleCount;
+        int stalkersInScene = FindObjectsByType<Stalker>(FindObjectsSortMode.None).Length;
+        string moduleColor = activeModules == 1 ? "#77dd77" : "#ff5555";
+        string stalkerColor = stalkersInScene == 1 ? "#77dd77" : "#ff5555";
+
         // 연결 누락은 눈에 띄게 — 이것 때문에 '있음인데 아무것도 안 보이는' 사고가 난다.
         string stalkerWarning = gm.Stalker == null
             ? "\n<color=#ff5555>⚠ GameManager의 Stalker 슬롯 비어 있음</color>"
@@ -100,12 +107,13 @@ public class DebugPanel : MonoBehaviour
             $"진행도 {gm.Progress}/{gm.ClearGoal}   누적 오답 {gm.Mistakes}/{gm.MistakesBeforeStalker}\n" +
             $"이번 방 이상현상: <b>{anomaly}</b>   정답: {answer}   판정함: {(gm.HasJudged ? "예" : "아니오")}\n" +
             $"피신 상태: {(gm.PlayerIsSheltered ? "안전 (문 닫힘)" : "노출")}\n" +
+            $"활성 모듈 <color={moduleColor}>{activeModules}개</color>   추격자(씬) <color={stalkerColor}>{stalkersInScene}마리</color>\n" +
             $"추격자: {stalkerState}" +
             stalkerWarning;
 
         // 글자가 배경에 묻히지 않게 어두운 판을 깔아준다.
-        // 추격자 줄이 두 줄이라 그만큼 더 잡는다.
-        float height = stalkerWarning == "" ? 112f : 132f;
+        // 활성 모듈/추격자 검증 줄 + 추격자 상태 줄이 두 줄이라 그만큼 더 잡는다.
+        float height = stalkerWarning == "" ? 132f : 152f;
         GUI.Box(new Rect(8, 8, 620, height), GUIContent.none);
         GUI.Label(new Rect(16, 12, 610, height), text, style);
     }
