@@ -48,6 +48,10 @@ public class GridDebugPanel : MonoBehaviour
     private Bounds localBounds;
     private bool localBoundsMeasured;
 
+    // 몫을 넘겼을 때 <b>어느 오브젝트가</b> 제일 멀리 뻗었는지. 크기가 초과라는 것만
+    // 알면 50개짜리 칸에서 범인을 손으로 찾아야 한다 — 이름 한 줄이면 바로 끝난다.
+    private string reachName = "";
+
     private void Awake()
     {
         grid = GetComponent<GridManager>();
@@ -115,7 +119,18 @@ public class GridDebugPanel : MonoBehaviour
             ? $"<color=#ff5555>초과 (X {overX:+0.0;-0.0}, Z {overZ:+0.0;-0.0}) — 이웃 칸을 침범한다</color>"
             : "<color=#77dd77>몫 안에 들어옴</color>";
 
-        return $"크기  실제 <b>{b.size.x:F1} x {b.size.z:F1}</b>   {verdict}";
+        if (!bad) return $"크기  실제 <b>{b.size.x:F1} x {b.size.z:F1}</b>   {verdict}";
+
+        // 어느 <b>쪽으로</b> 넘쳤는지가 핵심이다. 크기만 보면 '뭔가 크다'까지밖에 모르는데,
+        // 범위를 찍으면 +Z로 6.8m 삐져나갔다처럼 방향이 나와 찾을 자리가 좁혀진다.
+        string range =
+            $"\n범위  X <b>{b.min.x:+0.0;-0.0}</b> ~ <b>{b.max.x:+0.0;-0.0}</b>" +
+            $"   Z <b>{b.min.z:+0.0;-0.0}</b> ~ <b>{b.max.z:+0.0;-0.0}</b>" +
+            $"   (몫은 ±{allowed.x * 0.5f:F1} / ±{allowed.y * 0.5f:F1})";
+
+        string culprit = reachName.Length > 0 ? $"\n범인  {reachName}" : "";
+
+        return $"크기  실제 <b>{b.size.x:F1} x {b.size.z:F1}</b>   {verdict}{range}{culprit}";
     }
 
     /// <summary>
@@ -277,8 +292,30 @@ public class GridDebugPanel : MonoBehaviour
         if (renderers.Length == 0) return false;
 
         var world = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
+        float farthest = 0f;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
             world.Encapsulate(renderers[i].bounds);
+
+            // 칸 루트에서 가로로 제일 멀리 뻗은 렌더러를 기억해 둔다. 초과가 났을 때
+            // 이 이름 하나가 곧 "어디를 고쳐야 하나"의 답이다.
+            Vector3 lo = renderers[i].bounds.min - cell.transform.position;
+            Vector3 hi = renderers[i].bounds.max - cell.transform.position;
+            float reach = Mathf.Max(Mathf.Max(Mathf.Abs(lo.x), Mathf.Abs(hi.x)),
+                                    Mathf.Max(Mathf.Abs(lo.z), Mathf.Abs(hi.z)));
+
+            if (reach <= farthest) continue;
+
+            farthest = reach;
+
+            // 소속 그룹까지 붙인다 — 바닥과 천장은 <b>이름이 같은 프리팹</b>이라
+            // ("floor_ceiling_4x16") 이름만으로는 어느 쪽인지 갈리지 않는다.
+            var parent = renderers[i].transform.parent;
+            reachName = parent != null
+                ? $"{parent.name}/{renderers[i].name}   (칸 중심에서 {reach:F1}m)"
+                : $"{renderers[i].name}   (칸 중심에서 {reach:F1}m)";
+        }
 
         // 루트 기준으로 옮겨 담는다 — 칸은 전부 같은 프리팹의 평행이동이라 이 값이 공용이다.
         localBounds = new Bounds(world.center - cell.transform.position, world.size);

@@ -79,3 +79,10 @@ Thumbs.db
 # Editor / IDE local settings
 .vscode/
 *.slnx
+
+# Unity Recorder 출력 — 시연 영상은 결과물이지 소스가 아니다.
+# 이미지 시퀀스 한 번이 수백 MB라, 한 번 커밋되면 히스토리에서 못 지운다.
+/[Rr]ecordings/
+
+# 조각 자가 뽑는 치수 표 (사람이 읽는 중간 산출물)
+/ModuleRuler_Report.tsv

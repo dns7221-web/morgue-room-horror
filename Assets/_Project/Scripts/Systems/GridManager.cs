@@ -162,10 +162,18 @@ public class GridManager : MonoBehaviour
         CenterCoord += dir;
         RecycleTrailingLine(dir);
 
-        // 은폐 규칙 — 방금 들어온 쪽(뒤쪽)의 문은 전부 곧장 닫는다(이중문이면 양쪽 다).
+        // 은폐 규칙 — 방금 지나온 경계의 문을 전부 곧장 닫는다(이중문이면 양쪽 다).
         // 한쪽만 닫으면 나머지 한쪽 틈으로 재활용 순간이 새어 보인다.
+        //
+        // 경계 하나에 문이 <b>어느 칸 소속인지 정해져 있지 않다.</b> 문짝을 북·동에만
+        // 달면 지나온 경계의 문은 <b>떠나온 칸</b>이 들고 있어서, 들어온 칸만 보면
+        // 닫을 것을 못 찾고 문이 열린 채 남는다. 양쪽 칸에 다 걸어 둔다.
         foreach (var door in enteredCell.GetDoors(-dir))
             if (door != null) door.Close();
+
+        if (cells.TryGetValue(CenterCoord - dir, out var departed) && departed != null)
+            foreach (var door in departed.GetDoors(dir))
+                if (door != null) door.Close();
     }
 
     /// <summary>
@@ -220,6 +228,53 @@ public class GridManager : MonoBehaviour
     /// 같은 패턴. y값은 이 격자에서 안 쓰이므로 1로 채워만 둔다(0이면 Grid가 나눗셈에서
     /// 오류를 낸다).
     /// </summary>
+    /// <summary>
+    /// 씬 뷰에 칸 경계와 좌표를 그린다.
+    ///
+    /// 재활용은 <b>보이면 안 되는 사건</b>이라 게임 화면에서는 아무 일도 일어나지 않는
+    /// 것이 정상이다. 그런데 그러면 <b>제대로 도는지도 볼 수가 없다.</b> 표시판의 숫자만
+    /// 으로는 "배열이 한 칸 굴러갔다"는 것이 잘 안 읽혀서, 씬 뷰에 칸을 직접 그린다 —
+    /// 게임뷰는 착시를, 씬뷰는 원리를 보여준다는 이 포폴의 시연 방식 그대로다.
+    /// </summary>
+    private void OnDrawGizmos()
+    {
+        if (cells.Count == 0) return;   // 에디트 모드에는 칸이 없다
+
+        Vector2 s = Spacing;
+        var size = new Vector3(s.x, 0.2f, s.y);
+
+        foreach (var kv in cells)
+        {
+            if (kv.Value == null) continue;
+
+            bool isCenter = kv.Key == CenterCoord;
+            bool justMoved = LastRecycle.direction != Vector2Int.zero
+                          && Time.time - LastRecycle.time < 2f
+                          && kv.Key.x >= LastRecycle.to.x - 1 && kv.Key.x <= LastRecycle.to.x + 1
+                          && kv.Key.y >= LastRecycle.to.y - 1 && kv.Key.y <= LastRecycle.to.y + 1;
+
+            Gizmos.color = justMoved ? Color.red
+                         : isCenter ? Color.green
+                         : new Color(1f, 1f, 1f, 0.25f);
+
+            Vector3 center = kv.Value.transform.position;
+            Gizmos.DrawWireCube(center, size);
+
+            // 방금 옮겨온 줄은 바닥을 칠해 눈에 확 띄게 한다.
+            if (justMoved)
+            {
+                Gizmos.color = new Color(1f, 0f, 0f, 0.12f);
+                Gizmos.DrawCube(center, size);
+            }
+
+#if UNITY_EDITOR
+            UnityEditor.Handles.color = isCenter ? Color.green : Color.white;
+            UnityEditor.Handles.Label(center + Vector3.up * 2f,
+                                      isCenter ? $"[{kv.Key.x}, {kv.Key.y}] ◀ 지금 여기" : $"{kv.Key.x}, {kv.Key.y}");
+#endif
+        }
+    }
+
     private void MeasureSpacing()
     {
         var probe = Instantiate(cellPrefab, transform);
