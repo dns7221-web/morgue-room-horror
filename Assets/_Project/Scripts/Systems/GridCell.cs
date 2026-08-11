@@ -11,7 +11,7 @@ using UnityEngine;
 /// 소켓/문 참조는 <see cref="GridManager"/>가 대향 소켓 쌍(N↔S, E↔W) 간격을
 /// 재는 자로도 쓰고, 재활용 후 "방금 들어온 문을 닫는" 은폐 규칙에도 쓴다.
 /// </summary>
-public class GridCell : MonoBehaviour
+public class GridCell : MonoBehaviour, IAnomalyHost
 {
     /// <summary>4방향 중 하나. Inspector에서 실수로 (2,1) 같은 값을 넣는 사고를 막기 위해 enum으로 받는다.</summary>
     public enum CardinalDirection { North, East, South, West }
@@ -89,5 +89,90 @@ public class GridCell : MonoBehaviour
     public void PlaceAt(Vector3 position, Quaternion rotation)
     {
         transform.SetPositionAndRotation(position, rotation);
+    }
+
+    // ── IAnomalyHost — RoomModule과 같은 계약을 구현한다 ────────────────────
+    //
+    // AnomalyManager·StalkerPoint는 인스펙터에 손으로 연결하지 않고 자식에서 찾는다.
+    // GridCellBuilder가 조립할 때 이미 "Anomalies"(AnomalyManager 포함)와
+    // "StalkerPoint" 오브젝트를 이름 그대로 만들어 두므로, 기존 GridCell_v3 프리팹을
+    // 다시 조립하지 않아도 그대로 동작한다.
+
+    private AnomalyManager anomalyManager;
+    private Transform stalkerSpawnPoint;
+    private bool refsResolved;
+
+    /// <summary>로그 식별용 이름 (IAnomalyHost).</summary>
+    public string DisplayName => name;
+
+    /// <summary>이번 세팅에서 이 칸에 실제로 이상현상이 있는지 (판정 비교용).</summary>
+    public bool HasAnomaly { get; private set; }
+
+    /// <summary>이번 칸의 이상현상이 '그것'(추격자)인지.</summary>
+    public bool StalkerIsAnomaly { get; private set; }
+
+    /// <summary>
+    /// 이번 칸 이상현상 이름 (디버그 표시용). RoomModule.AnomalyLabel과 같은 패턴 —
+    /// 판정 자체는 HasAnomaly(있음/없음)만 보므로, 정확히 <b>무엇</b>이 걸렸는지는
+    /// 게임 로직에 필요 없다. 그래도 개발 중엔 "이 방에 지금 뭐가 있어야 정답인가"를
+    /// 눈으로 확인할 방법이 있어야 진짜 이상현상이 안 보이는 것인지(연출 버그)
+    /// 안 걸린 것인지(정상)를 가를 수 있다.
+    /// </summary>
+    public string AnomalyLabel
+    {
+        get
+        {
+            ResolveRefs();
+            if (!HasAnomaly) return "없음";
+            if (StalkerIsAnomaly) return "그것";
+            return anomalyManager != null ? anomalyManager.CurrentName : "있음";
+        }
+    }
+
+    /// <summary>이 칸에서 '그것'이 서는 자리. 자식의 "StalkerPoint"를 찾는다.</summary>
+    public Transform StalkerSpawnPoint
+    {
+        get { ResolveRefs(); return stalkerSpawnPoint; }
+    }
+
+    /// <summary>이상현상 유무를 세팅한다. 실제 발동/복원은 자식 AnomalyManager가 담당.</summary>
+    public void SetAnomaly(bool has)
+    {
+        ResolveRefs();
+        HasAnomaly = has;
+        StalkerIsAnomaly = false;
+        if (anomalyManager != null) anomalyManager.SetAnomaly(has);
+    }
+
+    /// <summary>
+    /// 이번 칸의 이상현상을 '그것'으로 고정한다 (칸 데이터만 — 물리적 등장은
+    /// GameManager가 <see cref="StalkerSpawnPoint"/>를 받아 씬 단일 Stalker에 지시한다).
+    /// RoomModule.SetStalkerAsAnomaly()와 같은 규칙: 다른 변형은 정상으로 복원한다.
+    /// </summary>
+    public void SetStalkerAsAnomaly()
+    {
+        ResolveRefs();
+        HasAnomaly = true;
+        StalkerIsAnomaly = true;
+        if (anomalyManager != null) anomalyManager.SetAnomaly(false);
+    }
+
+    /// <summary>
+    /// 이 칸이 좌표를 옮겨다니며 여러 번 재활용되는 동안 자식 구성은 바뀌지 않으므로,
+    /// 한 번만 찾아 캐시한다.
+    /// </summary>
+    private void ResolveRefs()
+    {
+        if (refsResolved) return;
+        refsResolved = true;
+
+        anomalyManager = GetComponentInChildren<AnomalyManager>(true);
+        var t = transform.Find("StalkerPoint");
+        stalkerSpawnPoint = t;
+
+        if (anomalyManager == null)
+            Debug.LogWarning($"[GridCell] {name} 아래에서 AnomalyManager를 찾지 못했습니다 — 이상현상이 하나도 안 나옵니다.", this);
+        if (stalkerSpawnPoint == null)
+            Debug.LogWarning($"[GridCell] {name} 아래에서 'StalkerPoint'를 찾지 못했습니다 — 추격자가 등장할 자리가 없습니다.", this);
     }
 }

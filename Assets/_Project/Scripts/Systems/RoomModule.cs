@@ -18,7 +18,7 @@ using UnityEngine;
 /// GameManager/Pool은 이 모듈에게 "이상현상 켜라 / 문 열어라 / 저기 붙어라"만
 /// 지시하고, 실제 처리는 각 하위 시스템에 위임한다 (관심사 분리).
 /// </summary>
-public class RoomModule : MonoBehaviour
+public class RoomModule : MonoBehaviour, IAnomalyHost
 {
     [Header("References (모두 이 프리팹의 자식)")]
     [Tooltip("이 모듈 소속 이상현상 관리자.")]
@@ -42,6 +42,9 @@ public class RoomModule : MonoBehaviour
 
     /// <summary>게임 최초 진입 시 플레이어 스폰 지점 (영안실 안쪽). 없으면 StartPoint로 대체.</summary>
     public Transform FirstEntryPoint => firstEntryPoint != null ? firstEntryPoint : startPoint;
+
+    /// <summary>로그 식별용 이름 (IAnomalyHost).</summary>
+    public string DisplayName => name;
 
     /// <summary>이번 세팅에서 이 방에 실제로 이상현상이 있는지 (판정 비교용).</summary>
     public bool HasAnomaly { get; private set; }

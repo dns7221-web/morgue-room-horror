@@ -39,6 +39,12 @@ public class GameManager : MonoBehaviour
     [Tooltip("씬 단일 추격자. 모듈이 몇 개 켜지든 이 한 마리만 존재한다 — 어느 방에 세울지는 그때그때 RoomModule.StalkerSpawnPoint를 넘겨 지시한다.")]
     [SerializeField] private Stalker stalker;
 
+    [Header("3x3 격자 모드")]
+    [Tooltip("켜면 RoomModulePool 대신 GridManager.CenterCell을 판정 대상으로 쓴다. " +
+             "3안 경로(pool 참조)는 건드리지 않고 완전히 갈라진 경로를 새로 탄다 — " +
+             "이 토글이 꺼져 있으면 아래 격자 코드는 전부 무시된다.")]
+    [SerializeField] private bool gridMode;
+
     [Header("Rules")]
     [Tooltip("이 횟수만큼 연속 성공하면 클리어.")]
     [SerializeField] private int clearGoal = 8;
@@ -62,14 +68,26 @@ public class GameManager : MonoBehaviour
     // 플레이어가 안전구역(영안실) 안에 있는지.
     private bool inSafeZone;
 
+    /// <summary>지금 RoomModulePool(3안) 대신 GridManager(격자)를 판정 대상으로 쓰는지.</summary>
+    private bool GridMode => gridMode && GridManager.Instance != null;
+
     /// <summary>
     /// 플레이어가 지금 안전한지 — <b>안전구역(키패드 방) 안 + 영안실 쪽 이중문이 닫힘</b>.
     /// 뛰어들어오는 것만으로는 부족하고, 돌아서서 문을 닫아야 성립한다.
+    ///
+    /// ⚠️ <b>격자에서는 아직 미정이다.</b> 3안은 [복도]─[키패드 방]─[영안실]로 안전구역이
+    /// 별도 방이었지만, 격자는 한 칸에 판정·관찰이 다 들어 있어 "무엇을 닫아야 안전한가"가
+    /// 3안과 똑같이 옮겨지지 않는다(예: 이 칸의 문을 전부 닫으면 안전? 그러면 추격자와
+    /// 한 방에 갇힌 채 안전한 게 말이 되나?). 그래서 지금은 격자에서 늘 false —
+    /// "볼 때 멈추고 안 볼 때 다가온다"는 Stalker의 기본 규칙만으로 돌아간다.
+    /// 격자용 피신 규칙은 별도로 설계해야 한다.
     /// </summary>
     public bool PlayerIsSheltered
     {
         get
         {
+            if (GridMode) return false;
+
             if (!inSafeZone || pool == null) return false;
             var active = pool.Active;
             return active != null && active.AreShelterDoorsClosed();
@@ -90,9 +108,19 @@ public class GameManager : MonoBehaviour
     public int Mistakes => mistakes;
     /// <summary>추격자 등장까지 필요한 누적 오답 수. 0이면 등장하지 않음.</summary>
     public int MistakesBeforeStalker => mistakesBeforeStalker;
-    /// <summary>현재 방에 이상현상이 있는지 (디버그·강제 판정용).</summary>
-    public bool CurrentRoomHasAnomaly => pool != null && pool.Active != null && pool.Active.HasAnomaly;
-    /// <summary>현재 활성 모듈 (디버그 표시용).</summary>
+    /// <summary>현재 방(3안) 또는 현재 칸(격자)에 이상현상이 있는지 (디버그·강제 판정용).</summary>
+    public bool CurrentRoomHasAnomaly => CurrentAnomalyHost != null && CurrentAnomalyHost.HasAnomaly;
+
+    /// <summary>지금 판정 대상인 방/칸. GridMode에 따라 갈린다 — Judge()·Dress()가 여기 하나만 본다.</summary>
+    private IAnomalyHost CurrentAnomalyHost
+    {
+        get
+        {
+            if (GridMode) return GridManager.Instance.CenterCell;
+            return pool != null ? pool.Active : null;
+        }
+    }
+    /// <summary>현재 활성 모듈 (디버그 표시용, 3안 전용).</summary>
     public RoomModule CurrentRoom => pool != null ? pool.Active : null;
 
     /// <summary>지금 화면에 켜져 있는 모듈 개수 (디버그 검증용). 3안 구조에서는 언제나 1이 정상.</summary>
@@ -101,30 +129,31 @@ public class GameManager : MonoBehaviour
     /// <summary>씬 단일 추격자 (디버그 표시용).</summary>
     public Stalker Stalker => stalker;
 
-    /// <summary>[디버그] 이번 방의 이상현상을 즉시 '그것'으로 바꾼다.</summary>
+    /// <summary>[디버그] 이번 방/칸의 이상현상을 즉시 '그것'으로 바꾼다.</summary>
     public void DebugMakeStalkerAnomaly()
     {
-        if (pool == null || pool.Active == null) return;
-        SetStalkerAsAnomaly(pool.Active);
+        var room = CurrentAnomalyHost;
+        if (room == null) return;
+        SetStalkerAsAnomaly(room);
         judged = false;
         Debug.Log("[Debug] 이번 방 이상현상을 '그것'으로 교체");
     }
 
     /// <summary>
-    /// 이 방을 '그것' 방으로 세팅하고, 씬 단일 추격자를 그 방의 스폰 지점에 등장시킨다.
+    /// 이 방/칸을 '그것' 방으로 세팅하고, 씬 단일 추격자를 그 스폰 지점에 등장시킨다.
     /// 방 데이터 세팅과 물리적 등장을 한 곳에서 묶어, 한쪽만 호출해 생기는
     /// "정답은 있음인데 화면엔 아무것도 없는" 사고를 막는다.
     /// </summary>
-    private void SetStalkerAsAnomaly(RoomModule module)
+    private void SetStalkerAsAnomaly(IAnomalyHost room)
     {
-        module.SetStalkerAsAnomaly();
+        room.SetStalkerAsAnomaly();
 
         if (stalker == null)
         {
             Debug.LogWarning("[GameManager] Stalker가 연결돼 있지 않아 '있음'인데 아무것도 나타나지 않습니다.", this);
             return;
         }
-        stalker.Appear(module.StalkerSpawnPoint);
+        stalker.Appear(room.StalkerSpawnPoint);
     }
 
     /// <summary>씬 단일 추격자를 물린다.</summary>
@@ -173,10 +202,35 @@ public class GameManager : MonoBehaviour
     {
         judgeYesAction?.Disable();
         judgeNoAction?.Disable();
+
+        if (gridMode && GridManager.Instance != null)
+        {
+            GridManager.Instance.CenterChanged -= OnGridCenterChanged;
+            GridManager.Instance.CellRecycled -= OnGridCellRecycled;
+        }
     }
 
     private void Start()
     {
+        if (GridMode)
+        {
+            var grid = GridManager.Instance;
+
+            // 판정 리셋(칸 전환)·재꾸미기(재활용)를 GridManager 이벤트에 접붙인다.
+            // GridManager가 직접 GameManager를 부르지 않는 이유는 관심사 분리 —
+            // "칸이 어디 있나"와 "그 칸에 뭐가 있어야 하나"를 갈라 둔다.
+            grid.CenterChanged += OnGridCenterChanged;
+            grid.CellRecycled += OnGridCellRecycled;
+
+            // GridManager.Start()가 이 스크립트보다 먼저 돌았을 수도, 나중에 돌 수도
+            // 있다(스크립트 실행 순서는 보장되지 않는다). 이미 칸이 서 있으면 곧장
+            // 시작하고, 아니면 Initialized를 기다린다 — 둘 다 안전하다.
+            if (grid.CenterCell != null) BeginGridFirstRoom(grid.CenterCell);
+            else grid.Initialized += BeginGridFirstRoom;
+
+            return;
+        }
+
         pool.Initialize();   // 모듈 풀 생성 + 배치 슬롯 실측 + 첫 모듈 배치
         EnterFirstRoom();    // 게임 최초 진입은 루프 재진입과 다르게 취급 (문 밖이 아니라 영안실 안쪽에서 시작)
     }
@@ -195,9 +249,17 @@ public class GameManager : MonoBehaviour
     public void Judge(bool playerSaysAnomaly)
     {
         if (judged) return;   // 이미 판정한 방이면 무시
+
+        var room = CurrentAnomalyHost;
+        if (room == null)
+        {
+            Debug.LogWarning("[GameManager] 판정할 방/칸을 찾지 못해 무시합니다.", this);
+            return;
+        }
+
         judged = true;
 
-        bool correct = (playerSaysAnomaly == pool.Active.HasAnomaly);
+        bool correct = (playerSaysAnomaly == room.HasAnomaly);
         if (correct)
         {
             progress++;
@@ -222,9 +284,10 @@ public class GameManager : MonoBehaviour
                 Debug.Log("[GameManager] 다음 방에는 그것이 있다");
         }
 
-        // 정답/오답과 무관하게 복도 문(들)의 잠금을 푼다.
+        // 정답/오답과 무관하게 문(들)의 잠금을 푼다.
         // 자동으로 열어주지는 않는다 — 나가는 문은 플레이어가 직접 E로 연다.
-        pool.Active.SetDoorsLocked(false);
+        if (GridMode) GridManager.Instance.SetCellExitsLocked(GridManager.Instance.CenterCell, false);
+        else pool.Active.SetDoorsLocked(false);
     }
 
     /// <summary>
@@ -365,29 +428,117 @@ public class GameManager : MonoBehaviour
         progress = 0;
         mistakes = 0;
         Debug.Log("[GameManager] 잡혔다 — 진행도 0");
+
+        // 오답과 같은 신호를 재사용한다 — 방을 안 바꾸는 격자에서는 특히,
+        // "방금 무슨 일이 있었다"를 알려줄 연출이 이것 말고 마땅치 않다.
+        if (wrongAnswerFlash != null) wrongAnswerFlash.Flash();
+
+        // ⚠️ 격자에서 잡히면 어떻게 되어야 하는지는 아직 정해지지 않았다. 3안처럼
+        // 다음 방으로 넘기는 동작(AdvanceToNextRoom)은 암전+순간이동이 전제인데
+        // 격자는 플레이어가 순간이동 없이 걸어다니는 구조라 그대로 못 쓴다. 지금은
+        // 추격자만 물리고 제자리에 둔다 — 벌칙 연출은 나중에 따로 설계해야 한다.
+        if (GridMode) { DismissStalker(); return; }
+
         AdvanceToNextRoom();
     }
 
     /// <summary>
-    /// 지정 모듈에 이상현상을 세팅한다 (방 '새로 꾸미기').
+    /// 지정 방/칸에 이상현상을 세팅한다 ('새로 꾸미기'). 3안·격자 공용 —
+    /// <see cref="IAnomalyHost"/> 하나만 알면 되므로 어느 쪽이 넘어와도 같게 처리한다.
     ///
     /// 누적 오답이 기준에 닿으면 랜덤을 돌리지 않고 <b>'그것'을 이번 방의 이상현상으로
     /// 고정</b>한다. 벌칙이되 규칙 밖의 사고가 아니라, 어디까지나 관찰로 발견하고
     /// O로 판정해야 하는 이상현상 중 하나로 다룬다.
+    ///
+    /// ⚠️ <b>데이터만 세팅한다 — 진짜 Stalker를 등장시키지 않는다.</b> 격자에서
+    /// 이 함수는 재활용 시점(<see cref="OnGridCellRecycled"/>)에도 불리는데, 그건
+    /// 플레이어가 아직 안 닿은 <b>먼 칸</b>을 미리 꾸미는 것이다. 여기서
+    /// <c>SetStalkerAsAnomaly(IAnomalyHost)</c>(등장까지 시키는 쪽)를 부르면 씬에
+    /// 하나뿐인 Stalker가 플레이어 눈앞이 아니라 그 먼 칸으로 즉시 텔레포트해버리고,
+    /// 플레이어가 실제로 다른 칸에 들어서는 순간 OnGridCenterChanged가 그 칸엔
+    /// '그것' 표시가 없다며 도로 숨겨버린다 — 위치도 엉뚱하고 몸도 꺼진 채로 남는
+    /// 원인이었다. <see cref="IAnomalyHost.SetStalkerAsAnomaly"/>(데이터 전용)만
+    /// 불러 세팅해 두면, 실제 등장은 플레이어가 그 칸에 들어서는 순간
+    /// (OnGridCenterChanged)에만 일어난다.
     /// </summary>
-    private void Dress(RoomModule module)
+    private void Dress(IAnomalyHost room)
     {
         if (mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
         {
             mistakes = 0;
-            SetStalkerAsAnomaly(module);
-            Debug.Log($"[GameManager] {module.name} 세팅 — 이상현상: 그것 (관찰해서 O로 판정할 것)");
+            room.SetStalkerAsAnomaly();
+            Debug.Log($"[GameManager] {room.DisplayName} 세팅 — 이상현상: 그것 (관찰해서 O로 판정할 것)");
             return;
         }
 
         bool has = Random.value < anomalyChance;
-        module.SetAnomaly(has);
-        Debug.Log($"[GameManager] {module.name} 세팅 — 이상현상: {(has ? "있음" : "없음")}");
+        room.SetAnomaly(has);
+        Debug.Log($"[GameManager] {room.DisplayName} 세팅 — 이상현상: {(has ? "있음" : "없음")}");
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // 3x3 격자 전용 경로 — GridManager 이벤트에 접붙인 판정 배선.
+    // 위의 Judge()/Dress()/SetStalkerAsAnomaly()는 3안과 공유하고,
+    // "언제 판정을 리셋하나 / 언제 새로 꾸미나"만 여기서 갈린다.
+    // ══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 게임 시작 직후 딱 한 번. 3안의 EnterFirstRoom()과 같은 이유로 중앙 칸은
+    /// 늘 '정상'으로 고정한다 — 플레이어가 무엇이 정상인지 먼저 익혀야 한다.
+    ///
+    /// 나머지 8칸도 여기서 한 번은 꾸며 둔다. 재활용된 적이 없는 칸은
+    /// (기본값 그대로) 이상현상이 없는 상태인데, 그대로 두면 처음 옆 칸으로
+    /// 넘어갔을 때 항상 '정상'으로만 보여 판정이 무의미해진다.
+    /// </summary>
+    private void BeginGridFirstRoom(GridCell centerCell)
+    {
+        if (centerCell == null)
+        {
+            Debug.LogError("[GameManager] GridManager가 중앙 칸을 못 만들어 격자 판정을 시작하지 못합니다.", this);
+            return;
+        }
+
+        centerCell.SetAnomaly(false);
+        Debug.Log($"[GameManager] {centerCell.name} 세팅 — 첫 방이라 이상현상 없음으로 고정");
+
+        foreach (var kv in GridManager.Instance.Cells)
+            if (kv.Value != null && kv.Value != centerCell) Dress(kv.Value);
+
+        judged = false;
+        mistakes = 0;
+        doorwayOccupied = false;
+
+        // 이상현상이 없는 방이어도 판정은 반드시 거쳐야 한다 — 무엇이 '정상'인지
+        // 관찰해서 X로 확인하는 것 자체가 학습이다(3안 EnterFirstRoom과 같은 이유).
+        GridManager.Instance.SetCellExitsLocked(centerCell, true);
+    }
+
+    /// <summary>
+    /// 플레이어가 선 칸(중앙)이 바뀔 때마다. 3안의 EnterRoom() 앞부분(judged 리셋 ·
+    /// DismissStalker → 다시 세우기)과 같은 역할을, 여기서는 "재활용"이 아니라
+    /// "칸을 넘어 걸어 들어감" 시점에 한다.
+    /// </summary>
+    private void OnGridCenterChanged(GridCell cell)
+    {
+        judged = false;
+        doorwayOccupied = false;
+
+        // 판정 전엔 이 방의 사방 출입문이 전부 잠긴다 — 이상현상을 관찰해서
+        // O/X로 답해야 다음 칸으로 나갈 수 있다. Judge()가 판정 직후 다시 푼다.
+        GridManager.Instance.SetCellExitsLocked(cell, true);
+
+        if (cell != null && cell.StalkerIsAnomaly) SetStalkerAsAnomaly(cell);
+        else DismissStalker();
+    }
+
+    /// <summary>
+    /// 칸 하나가 재활용으로 자리를 옮긴 직후 — 3안의 DoAdvance()가 다음 방을 Dress()로
+    /// 새로 꾸미던 것과 같은 지점이다. 재활용은 언제나 플레이어가 닿기 <b>전</b>에
+    /// 일어나므로(2칸 뒤에서 조용히), 다시 꾸며도 눈에 띄지 않는다.
+    /// </summary>
+    private void OnGridCellRecycled(GridCell cell)
+    {
+        if (cell != null) Dress(cell);
     }
 
     /// <summary>

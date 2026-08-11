@@ -81,6 +81,7 @@ public class GridDebugPanel : MonoBehaviour
             SpacingLine() + "\n" +
             SizeLine() + "\n" +
             CenterLine() + "\n" +
+            AnomalyLine() + "\n" +
             RecycleLine() + "\n" +
             WiringLine() + "\n" +
             MiniMap();
@@ -153,6 +154,30 @@ public class GridDebugPanel : MonoBehaviour
             : $"<color=#ff5555>불일치 — 진입 판정을 놓쳤다</color>";
 
         return line + $"\n실제  플레이어가 선 칸 <b>({actual.x}, {actual.y})</b>   {match}";
+    }
+
+    /// <summary>
+    /// 지금 선 칸의 정답 — 없음 / 있음(변형 이름) / 그것.
+    ///
+    /// 판정 로직은 HasAnomaly(있음·없음)만 보고 <b>무엇</b>인지는 몰라도 되지만,
+    /// 개발 중엔 이 줄이 없으면 "이상현상이 안 보이는 게 연출 버그인지, 애초에
+    /// 안 걸린 것인지"를 화면만 보고는 가를 수 없다. 정답을 미리 알려주는 치트지만
+    /// 어차피 F6로 껐다 켤 수 있는 디버그 표시판이다.
+    /// </summary>
+    private string AnomalyLine()
+    {
+        var cell = grid.CenterCell;
+        if (cell == null) return "이상현상  <color=#ffcc55>중앙 칸이 없다</color>";
+
+        string label = cell.AnomalyLabel;
+        string color = label switch
+        {
+            "없음" => "#77dd77",
+            "그것" => "#ff5555",
+            _ => "#ffcc55",   // 변형 이름 — 눈에 띄되 위험색은 아니게
+        };
+
+        return $"이상현상  <color={color}><b>{label}</b></color>";
     }
 
     /// <summary>마지막 재활용. 한 칸 넘어갈 때마다 갱신돼야 정상이다.</summary>

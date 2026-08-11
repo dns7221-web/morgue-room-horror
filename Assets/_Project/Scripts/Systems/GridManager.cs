@@ -76,6 +76,22 @@ public class GridManager : MonoBehaviour
     /// <summary>마지막 재활용 기록. 아직 한 번도 없었으면 direction이 zero.</summary>
     public RecycleRecord LastRecycle { get; private set; }
 
+    // ── GameManager가 판정 로직을 여기에 접붙이기 위한 신호 ────────────────
+    //
+    // GridManager는 "칸이 어디 있는가"만 알고 "그 칸에 뭐가 있어야 하는가"는 모른다
+    // (관심사 분리 — GameManager와 같은 철학). 그래서 직접 판정 로직을 부르는 대신
+    // 이벤트만 낸다. 구독자가 없어도(GameManager가 gridMode를 안 켰거나 아직 없어도)
+    // 격자 자체는 그대로 돌아간다.
+
+    /// <summary>3x3 칸이 처음 다 서고 플레이어가 중앙에 놓인 직후, 그 중앙 칸과 함께 딱 한 번 울린다.</summary>
+    public event System.Action<GridCell> Initialized;
+
+    /// <summary>플레이어가 선 칸(중앙)이 바뀔 때마다 새 CenterCell과 함께 울린다.</summary>
+    public event System.Action<GridCell> CenterChanged;
+
+    /// <summary>재활용으로 자리를 옮긴 칸을 한 개씩, 새 자리에 놓인 <b>뒤에</b> 알린다 — "이 칸을 새로 꾸며라"는 신호.</summary>
+    public event System.Action<GridCell> CellRecycled;
+
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -113,6 +129,8 @@ public class GridManager : MonoBehaviour
         CenterCoord = Vector2Int.zero;
 
         SpawnPlayerInCenter();
+
+        Initialized?.Invoke(CenterCell);
     }
 
     /// <summary>
@@ -161,6 +179,7 @@ public class GridManager : MonoBehaviour
 
         CenterCoord += dir;
         RecycleTrailingLine(dir);
+        CenterChanged?.Invoke(CenterCell);
 
         // 은폐 규칙 — 방금 지나온 경계의 문을 전부 곧장 닫는다(이중문이면 양쪽 다).
         // 한쪽만 닫으면 나머지 한쪽 틈으로 재활용 순간이 새어 보인다.
@@ -210,7 +229,37 @@ public class GridManager : MonoBehaviour
             cells[newCoord] = cell;
             cell.Coord = newCoord;
             PlaceCell(cell, newCoord);
+            CellRecycled?.Invoke(cell);
         }
+    }
+
+    /// <summary>
+    /// 지정 칸의 사방 출입문을 전부 잠그거나 푼다 — 판정 전엔 어느 방향으로도
+    /// 못 나가게 GameManager가 쓴다.
+    ///
+    /// 문짝은 <b>북·동에만</b> 있다(겪은 버그 ⑤ — 경계마다 문이 두 짝이면 두 번 열게
+    /// 된다). 그래서 이 칸의 남·서쪽 경계는 <b>이웃 칸이 실제 문을 들고 있다</b> —
+    /// 칸 좌표를 기준으로 소유자를 다시 찾아야 하고, 그게 GridCell 하나만으로는 안 되고
+    /// 격자 전체를 아는 GridManager에 있어야 하는 이유다.
+    /// </summary>
+    public void SetCellExitsLocked(GridCell cell, bool locked)
+    {
+        if (cell == null) return;
+        Vector2Int coord = cell.Coord;
+
+        LockDoors(cell.GetDoors(North), locked);
+        LockDoors(cell.GetDoors(East), locked);
+
+        if (cells.TryGetValue(coord + South, out var southNeighbor) && southNeighbor != null)
+            LockDoors(southNeighbor.GetDoors(North), locked);
+        if (cells.TryGetValue(coord + West, out var westNeighbor) && westNeighbor != null)
+            LockDoors(westNeighbor.GetDoors(East), locked);
+    }
+
+    private static void LockDoors(Door[] doors, bool locked)
+    {
+        foreach (var d in doors)
+            if (d != null) d.SetLocked(locked);
     }
 
     private void PlaceCell(GridCell cell, Vector2Int coord)

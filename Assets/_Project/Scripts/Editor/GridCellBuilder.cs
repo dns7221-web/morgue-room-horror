@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 
@@ -92,6 +93,10 @@ public class GridCellBuilder : EditorWindow
     [SerializeField] private bool flipKeypadFacing;
     [SerializeField] private bool addJudgmentPanel = true;
 
+    [SerializeField] private bool addProgressDisplay = true;
+    [SerializeField] private float progressDisplayHeight = 0.5f;   // 키패드 위로 띄우는 높이
+    [SerializeField] private TMP_FontAsset progressFont;
+
     private Vector2 scroll;
     private GUIStyle wrapped;
     private GUIStyle Wrapped => wrapped ??= new GUIStyle(EditorStyles.label) { wordWrap = true };
@@ -127,6 +132,8 @@ public class GridCellBuilder : EditorWindow
         keypadPrefab ??= Load("Assets/ThirdParty/Keypad/Prefabs/Keypad.prefab");
         ceilingLightPrefab ??= Load("Assets/ThirdParty/Morgue Room PBR/Prefabs/props/ceiling_light.prefab");
         corpsePrefab ??= Load("Assets/_Project/Prefabs/corpse_in_a_bag.prefab");
+        progressFont ??= AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(
+            "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
     }
 
     private static GameObject Load(string path) => AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -242,6 +249,20 @@ public class GridCellBuilder : EditorWindow
         keypadDepth = EditorGUILayout.FloatField(new GUIContent("벽에서 띄우기 (m)", "양수면 방 안쪽으로 나온다. 벽에 파묻히면 늘린다."), keypadDepth);
         flipKeypadFacing = EditorGUILayout.Toggle(new GUIContent("키패드 뒤집기", "키패드가 벽을 보고 있으면 켠다."), flipKeypadFacing);
         addJudgmentPanel = EditorGUILayout.Toggle(new GUIContent("JudgmentPanel 붙이기", "E로 판정 UI를 여는 컴포넌트. GameManager가 없어도 안전하게 가만있는다."), addJudgmentPanel);
+
+        addProgressDisplay = EditorGUILayout.Toggle(
+            new GUIContent("진행도 표시 붙이기", "키패드 위에 '1 / 8' 월드 스페이스 텍스트를 심는다. 4면 전부."),
+            addProgressDisplay);
+        using (new EditorGUI.DisabledScope(!addProgressDisplay))
+            progressDisplayHeight = EditorGUILayout.FloatField(new GUIContent("표시 높이 (m)", "키패드 위로 띄우는 양."), progressDisplayHeight);
+
+        if (GUILayout.Button("선택한 칸에 진행도 표시만 추가 (다시 안 지음)"))
+            AddProgressDisplaysToSelection();
+        EditorGUILayout.HelpBox(
+            "칸 만들기는 매번 새 오브젝트를 처음부터 짓는다 — 이미 손으로 다듬은 칸(GridCell_v3 등)엔 그걸 " +
+            "다시 누르지 말고, 그 칸을 선택한 뒤 이 버튼만 누르세요. 이미 있는 JudgmentPanel(키패드) 4곳을 찾아 " +
+            "진행도 표시만 얹고, 나머지는 하나도 안 건드립니다.",
+            MessageType.Info);
 
         DrawSummary();
 
@@ -568,6 +589,118 @@ public class GridCellBuilder : EditorWindow
 
         if (addJudgmentPanel && keypad.GetComponentInChildren<JudgmentPanel>(true) == null)
             Undo.AddComponent<JudgmentPanel>(keypad);
+
+        if (addProgressDisplay)
+            BuildProgressDisplay(side, dirName, pos + Vector3.up * progressDisplayHeight, keypad.transform.rotation);
+    }
+
+    /// <summary>
+    /// <b>이미 있는 칸</b>에서 키패드(JudgmentPanel)를 전부 찾아 진행도 표시만 얹는다 —
+    /// 칸을 통째로 다시 짓지 않는다. 문짝을 손으로 눈으로 맞췄던 "문간 하나만 만들기"와
+    /// 같은 이유다: 이미 다듬어놓은 칸(예: GridCell_v3)에 새 기능 하나만 추가하고 싶을 때,
+    /// '칸 만들기'를 다시 누르면 그 프리팹은 그대로 두고 <b>엉뚱한 새 오브젝트</b>가
+    /// 하나 더 생길 뿐이다 — 이 버튼은 선택한 대상 안쪽만 고친다.
+    /// </summary>
+    private void AddProgressDisplaysToSelection()
+    {
+        var selected = Selection.activeGameObject;
+        if (selected == null)
+        {
+            Debug.LogWarning("[칸 조립기] 칸이나 키패드를 먼저 선택하세요.");
+            return;
+        }
+
+        var panels = selected.GetComponentsInChildren<JudgmentPanel>(true);
+        if (panels.Length == 0)
+        {
+            Debug.LogWarning($"[칸 조립기] {selected.name} 아래에 JudgmentPanel(키패드)이 없습니다.", selected);
+            return;
+        }
+
+        int undoGroup = Undo.GetCurrentGroup();
+        Undo.SetCurrentGroupName("진행도 표시 추가");
+
+        int added = 0, skipped = 0;
+        foreach (var panel in panels)
+        {
+            var keypad = panel.gameObject;
+
+            // 이미 붙어 있으면 건너뛴다 — 버튼을 두 번 눌러도 중복으로 안 쌓인다.
+            if (keypad.GetComponentInChildren<ProgressUI>(true) != null) { skipped++; continue; }
+
+            var parent = keypad.transform.parent != null ? keypad.transform.parent : keypad.transform;
+            Vector3 pos = keypad.transform.localPosition + Vector3.up * progressDisplayHeight;
+
+            BuildProgressDisplay(parent, keypad.name, pos, keypad.transform.localRotation);
+            added++;
+        }
+
+        Undo.CollapseUndoOperations(undoGroup);
+        Debug.Log($"[칸 조립기] 진행도 표시 {added}개를 추가했습니다" +
+                  (skipped > 0 ? $" (이미 있어서 건너뛴 것 {skipped}개)." : "."), selected);
+    }
+
+    /// <summary>
+    /// 키패드 위에 "1 / 8" 월드 스페이스 텍스트를 심는다.
+    ///
+    /// 3안은 건물이 통째로 움직여서 <c>FollowActiveRoom</c>으로 UI가 매 프레임
+    /// 따라다녀야 했지만, 격자는 <b>키패드가 각 칸에 고정으로 박혀 있어 그럴 필요가
+    /// 없다.</b> 재활용으로 칸이 옮겨갈 때 이 텍스트도 부모(칸)를 따라 그냥 같이
+    /// 움직인다 — 별도 컴포넌트 없이 Transform 부모-자식 관계만으로 해결된다.
+    ///
+    /// <see cref="ProgressUI"/> 자체는 매 프레임 GameManager.Progress만 읽는
+    /// 위치 무관 컴포넌트라, 네 면에 몇 개를 심든 전부 같은 값을 보여준다.
+    /// 사방 어디서 판정하든 자기 바로 위에서 진행도가 보이는 게 목표라 4개 다 심는다.
+    ///
+    /// 크기·글자 크기는 3안 씬의 기존 ProgressUI를 그대로 실측해 가져온 값이다
+    /// (Canvas sizeDelta 1x1, 텍스트 sizeDelta 1.6x0.6, 폰트 크기 0.2).
+    /// </summary>
+    private void BuildProgressDisplay(Transform parent, string dirName, Vector3 position, Quaternion rotation)
+    {
+        var canvasGO = new GameObject($"ProgressUI_{dirName}", typeof(RectTransform), typeof(Canvas));
+        Undo.RegisterCreatedObjectUndo(canvasGO, "칸 만들기");
+        canvasGO.transform.SetParent(parent, false);
+
+        var canvas = canvasGO.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        var canvasRect = canvasGO.GetComponent<RectTransform>();
+        // 앵커·피벗을 명시하지 않으면 스크립트로 갓 만든 RectTransform은 기본값(0,0 anchor)을
+        // 쓰는데, 부모-자식 간 기준점이 서로 어긋나 글자가 엉뚱한 자리로 밀리거나 찌그러진
+        // 크기로 계산된다 — 3안 원본 Canvas를 실측한 값(가운데 정렬, 1x1)을 그대로 준다.
+        //
+        // ⚠ 위치를 세팅하기 <b>전에</b> 앵커부터 정해야 한다. SetPointAnchor는 anchoredPosition을
+        // 0으로 초기화하는데, 이게 실제 위치 지정보다 나중에 실행되면 방금 준 위치를 도로 지운다.
+        SetPointAnchor(canvasRect, new Vector2(1f, 1f));
+        canvasGO.transform.SetLocalPositionAndRotation(position, rotation);
+
+        var textGO = new GameObject("Text (TMP)", typeof(RectTransform));
+        Undo.RegisterCreatedObjectUndo(textGO, "칸 만들기");
+        textGO.transform.SetParent(canvasGO.transform, false);
+        var textRect = textGO.GetComponent<RectTransform>();
+        SetPointAnchor(textRect, new Vector2(1.6f, 0.6f));
+
+        var tmp = textGO.AddComponent<TextMeshProUGUI>();
+        if (progressFont != null) tmp.font = progressFont;   // 지정 안 하면 TMP 기본 폰트 설정에 기대야 하는데, 그게 안 잡혀 있으면 글자가 통째로 안 보인다
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.fontSize = 0.2f;
+        tmp.text = "1 / 8";
+        tmp.raycastTarget = false;   // 순수 표시용 — 클릭/조준을 가로챌 이유가 없다
+
+        textGO.AddComponent<ProgressUI>();   // 비워두면 같은 오브젝트의 TMP를 자동으로 찾는다
+    }
+
+    /// <summary>
+    /// RectTransform을 "가운데 한 점" 앵커로 고정한다(anchorMin=anchorMax=pivot=0.5,0.5).
+    /// 이러면 로컬 위치가 곧 화면상 중심 좌표가 되어, 부모-자식 간 기준점이 서로
+    /// 어긋나 글자가 안 보이거나 잘리는 사고를 피할 수 있다.
+    /// </summary>
+    private static void SetPointAnchor(RectTransform rect, Vector2 size)
+    {
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = size;
     }
 
     /// <summary>
