@@ -72,21 +72,34 @@ public class GameManager : MonoBehaviour
     private bool GridMode => gridMode && GridManager.Instance != null;
 
     /// <summary>
-    /// 플레이어가 지금 안전한지 — <b>안전구역(키패드 방) 안 + 영안실 쪽 이중문이 닫힘</b>.
+    /// 플레이어가 지금 안전한지.
+    ///
+    /// ── 3안 ── <b>안전구역(키패드 방) 안 + 영안실 쪽 이중문이 닫힘</b>.
     /// 뛰어들어오는 것만으로는 부족하고, 돌아서서 문을 닫아야 성립한다.
     ///
-    /// ⚠️ <b>격자에서는 아직 미정이다.</b> 3안은 [복도]─[키패드 방]─[영안실]로 안전구역이
-    /// 별도 방이었지만, 격자는 한 칸에 판정·관찰이 다 들어 있어 "무엇을 닫아야 안전한가"가
-    /// 3안과 똑같이 옮겨지지 않는다(예: 이 칸의 문을 전부 닫으면 안전? 그러면 추격자와
-    /// 한 방에 갇힌 채 안전한 게 말이 되나?). 그래서 지금은 격자에서 늘 false —
-    /// "볼 때 멈추고 안 볼 때 다가온다"는 Stalker의 기본 규칙만으로 돌아간다.
-    /// 격자용 피신 규칙은 별도로 설계해야 한다.
+    /// ── 격자 ── "칸"이 아니라 <b>경계 문</b>이 기준이다. 격자는 방 유형이 없어
+    /// 3안의 '안전한 방' 개념이 그대로 안 옮겨지지만, 3안 규칙의 본질은 사실
+    /// "나와 추격자 사이 문이 닫혀 있다"였다. 그걸 그대로 일반화한다 —
+    /// <b>내 칸 ≠ 추격자가 있는 칸이고, 그 사이 경계 문이 닫혀 있으면 안전.</b>
+    /// 같은 칸에 있으면 문을 다 닫아도 안전할 수 없다(자기 칸은 경계가 아니므로
+    /// 첫 조건에서 이미 걸러진다). 인접하지 않으면 애초에 위협이 안 닿으므로 안전으로 본다
+    /// (AreBoundaryDoorsClosed가 처리).
     /// </summary>
     public bool PlayerIsSheltered
     {
         get
         {
-            if (GridMode) return false;
+            if (GridMode)
+            {
+                var gm = GridManager.Instance;
+                if (stalker == null || gm == null) return false;
+
+                Vector2Int playerCoord = gm.CenterCoord;
+                Vector2Int stalkerCoord = gm.GetCoordAt(stalker.transform.position);
+                if (playerCoord == stalkerCoord) return false;
+
+                return gm.AreBoundaryDoorsClosed(playerCoord, stalkerCoord);
+            }
 
             if (!inSafeZone || pool == null) return false;
             var active = pool.Active;

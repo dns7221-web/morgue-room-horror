@@ -262,6 +262,52 @@ public class GridManager : MonoBehaviour
             if (d != null) d.SetLocked(locked);
     }
 
+    /// <summary>
+    /// 월드 좌표가 속한 칸 좌표. 격자 밖이어도 좌표 자체는 항상 나온다 —
+    /// 존재 여부는 호출부가 <see cref="Cells"/>로 확인한다.
+    ///
+    /// ⚠️ <see cref="Grid.WorldToCell"/>을 그대로 쓰면 안 된다 — 그건 칸의 <b>모서리</b>가
+    /// 경계라고 가정하는데, <see cref="PlaceCell"/>이 놓는 방 프리팹은 원점이 <b>방
+    /// 정중앙</b>이다(PlaceCell 주석 참고 — 프리팹 원점을 CellToWorld 결과에 그대로 맞춘다).
+    /// 그래서 floor 대신 <b>제일 가까운 칸 중심</b>으로 반올림해야 방의 절반이 옆 칸으로
+    /// 오판되지 않는다.
+    /// </summary>
+    public Vector2Int GetCoordAt(Vector3 worldPos)
+    {
+        Vector3 local = transform.InverseTransformPoint(worldPos);
+        return new Vector2Int(
+            Mathf.RoundToInt(local.x / grid.cellSize.x),
+            Mathf.RoundToInt(local.z / grid.cellSize.z));
+    }
+
+    /// <summary>
+    /// 인접한 두 칸 사이 경계의 문이 전부 닫혀 있는지 — 추격자 피신 규칙(GameManager.
+    /// PlayerIsSheltered)이 쓴다. 인접하지 않으면 막을 문이 없다는 뜻이라 true(안전)로 본다.
+    /// </summary>
+    public bool AreBoundaryDoorsClosed(Vector2Int a, Vector2Int b)
+    {
+        Vector2Int dir = b - a;
+        if (Mathf.Abs(dir.x) + Mathf.Abs(dir.y) != 1) return true;
+
+        foreach (var door in GetBoundaryDoors(a, dir))
+            if (door != null && door.IsOpen) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// a에서 dir 방향 경계의 문을 찾는다. 문짝은 북·동에만 있어(SetCellExitsLocked 참고)
+    /// 남·서쪽 경계는 <b>이웃 칸이 반대쪽(북·동)으로 들고 있는 문</b>을 대신 찾는다.
+    /// </summary>
+    private Door[] GetBoundaryDoors(Vector2Int a, Vector2Int dir)
+    {
+        if (dir == North || dir == East)
+            return cells.TryGetValue(a, out var cell) && cell != null
+                ? cell.GetDoors(dir) : System.Array.Empty<Door>();
+
+        return cells.TryGetValue(a + dir, out var neighbor) && neighbor != null
+            ? neighbor.GetDoors(-dir) : System.Array.Empty<Door>();
+    }
+
     private void PlaceCell(GridCell cell, Vector2Int coord)
     {
         // GetCellCenterWorld가 아니라 CellToWorld를 쓴다 — 전자는 '칸 중심'을 주느라
