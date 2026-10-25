@@ -1,3 +1,4 @@
+using Unity.Profiling;
 using UnityEngine;
 
 /// <summary>
@@ -72,6 +73,9 @@ public class Stalker : MonoBehaviour
     private Camera eye;
     private Transform player;
     private bool active;
+
+    // 추가 생성 — 렉 미터용 계측 구간. 이름을 LagMeterRows가 그대로 등록한다.
+    private static readonly ProfilerMarker s_sightMarker = new ProfilerMarker("Stalker.Sight");
 
     // [디버그] 마지막 프레임의 시야 판정 결과. '쳐다봤는데 안 멈춘다'가
     // 화면 밖 판정 탓인지, 무언가에 가려진 탓인지 눈으로 가르려고 남긴다.
@@ -256,6 +260,10 @@ public class Stalker : MonoBehaviour
     /// </summary>
     private bool IsSeenByPlayer()
     {
+        // 추가 생성 — 이 판정은 추격자가 활성인 동안 <b>매 프레임</b> 돈다(절두체 + 표본점 Linecast).
+        // 재활용(한 칸에 한 번)과 달리 상시 비용이라, 렉 미터 표에서 둘을 같이 보는 게 의미가 있다.
+        using var _ = s_sightMarker.Auto();
+
         // ① 절두체 — 화면 밖이면 볼 수 없다.
         var planes = GeometryUtility.CalculateFrustumPlanes(eye);
         bool onScreen = false;

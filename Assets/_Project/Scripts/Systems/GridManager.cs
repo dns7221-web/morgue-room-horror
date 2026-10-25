@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 
 /// <summary>
@@ -266,6 +267,11 @@ public class GridManager : MonoBehaviour
     /// </summary>
     private void RecycleTrailingLine(Vector2Int dir)
     {
+        // 추가 생성 — 재활용 한 번이 몇 ms인지 렉 미터가 읽어간다(LagMeterRows 참고).
+        // 이 포폴의 주장이 "끊김 없이 걸어서 넘어간다"인데, 여기가 무거우면 그 프레임이
+        // 튀어 주장 자체가 깨진다. 지금까지는 안 튀는 것을 눈으로만 확인했다.
+        using var _ = s_recycleMarker.Auto();
+
         int r = Radius;
         Vector2Int perp = new(-dir.y, dir.x);
         Vector2Int edgeBase = CenterCoord - dir * (r + 1); // 새 중앙 기준 뒤처진 행/열의 대표 좌표
@@ -314,6 +320,10 @@ public class GridManager : MonoBehaviour
         // 걸 봤는가", 4번은 "나타나는 걸 봤는가"를 검사한다. 하나만 두면 반쪽이다.
         coverageAudit?.Check(movingCells, CenterCoord, CoverageAudit.Phase.Arriving);
     }
+
+    // 추가 생성 — 렉 미터용 계측 구간. 이름을 LagMeterRows가 그대로 등록한다.
+    // 프로파일러가 꺼진 빌드에서는 유니티가 이 구간을 사실상 비용 없이 넘긴다.
+    private static readonly ProfilerMarker s_recycleMarker = new ProfilerMarker("GridManager.Recycle");
 
     /// <summary>
     /// 지정 칸의 사방 출입문을 전부 잠그거나 푼다 — 판정 전엔 어느 방향으로도

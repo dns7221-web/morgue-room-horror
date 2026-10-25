@@ -1,3 +1,4 @@
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -154,6 +155,9 @@ public class GameManager : MonoBehaviour
     private InputAction judgeYesAction; // O = 있음
     private InputAction judgeNoAction;  // X = 없음
 
+    // 추가 생성 — 렉 미터용 계측 구간. 이름을 LagMeterRows가 그대로 등록한다.
+    private static readonly ProfilerMarker s_dressMarker = new ProfilerMarker("GameManager.Dress");
+
     private void Awake()
     {
         // 싱글톤 세팅
@@ -309,6 +313,10 @@ public class GameManager : MonoBehaviour
     /// </param>
     private void Dress(IAnomalyHost room, bool allowStalker)
     {
+        // 추가 생성 — 재활용 프레임에 얹히는 몫. 재활용 자체(좌표 계산 + 배치)보다
+        // 이상현상 복원·발동이 더 무거울 수 있어, 합계가 아니라 따로 봐야 원인이 갈린다.
+        using var _ = s_dressMarker.Auto();
+
         if (allowStalker && mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
         {
             // ⚠️ 여기서 mistakes를 0으로 돌리지 않는다 — 청산은 벌칙이 실제로 도착한

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 
 /// <summary>
@@ -67,6 +68,9 @@ public class CoverageAudit : MonoBehaviour
 
     private Camera eye;
 
+    // 추가 생성 — 렉 미터용 계측 구간. 이름을 LagMeterRows가 그대로 등록한다.
+    private static readonly ProfilerMarker s_checkMarker = new ProfilerMarker("CoverageAudit.Check");
+
     /// <summary>지금까지 검사한 횟수 (재활용 1회당 2 — 사라질 때·나타날 때).</summary>
     public int CheckCount { get; private set; }
 
@@ -85,6 +89,10 @@ public class CoverageAudit : MonoBehaviour
     /// </summary>
     public void Check(IReadOnlyList<GridCell> cells, Vector2Int playerCoord, Phase phase)
     {
+        // 추가 생성 — 주석에 "비용은 무시할 만하다"고 써둔 것을 렉 미터가 숫자로 검증한다.
+        // 주장은 이 프로젝트에서 계측으로 바꾸기로 했으므로, 검사기 자신도 예외가 아니다.
+        using var _ = s_checkMarker.Auto();
+
         if (cells == null || cells.Count == 0) return;
 
         var grid = GridManager.Instance;
