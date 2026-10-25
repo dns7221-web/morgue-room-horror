@@ -108,12 +108,12 @@ public class SlideAnomaly : Anomaly
     /// <summary>
     /// targets가 비어 있으면 이름으로 자동 수집한다.
     ///
-    /// 탐색 범위를 <b>이 방 안</b>으로 한정하는 게 핵심이다. transform.root에서 찾으면
-    /// 풀에 함께 매달린 <b>다른 방의 서랍까지</b> 긁어와 엉뚱한 방이 열린다.
+    /// 탐색 범위를 <b>이 칸 안</b>으로 한정하는 게 핵심이다. transform.root에서 찾으면
+    /// 격자에 함께 깔린 <b>다른 칸의 서랍까지</b> 긁어와 엉뚱한 칸이 열린다.
     ///
-    /// 방을 대표하는 것이 3안은 <see cref="RoomModule"/>, 3x3 격자는 <see cref="GridCell"/>로
-    /// 서로 다르다. 둘 다 보지 않으면 격자에서는 <b>범위가 자기 자신으로 쪼그라들어 0개를
-    /// 찾고</b>, 그런데도 조용히 넘어가서 "이 이상현상만 안 나온다"로 나타난다.
+    /// 칸을 대표하는 것은 <see cref="GridCell"/>이다. 이걸 못 찾으면 범위가
+    /// <b>자기 자신으로 쪼그라들어 0개를 찾고</b>, 그런데도 조용히 넘어가서
+    /// "이 이상현상만 안 나온다"로 나타난다 — 원인을 짐작하기 특히 어려운 종류다.
     /// </summary>
     private void CollectTargets()
     {
@@ -130,12 +130,10 @@ public class SlideAnomaly : Anomaly
         targets = found.ToArray();
     }
 
-    /// <summary>이 이상현상이 속한 '방'의 루트. 못 찾으면 자기 자신(범위를 넓히는 쪽으로 틀리지 않는다).</summary>
+    /// <summary>이 이상현상이 속한 '칸'의 루트. 못 찾으면 자기 자신(범위를 넓히는 쪽으로 틀리지 않는다).</summary>
     private Transform FindRoomRoot()
     {
-        var module = GetComponentInParent<RoomModule>();
-        if (module != null) return module.transform;
-
+        // 3안의 RoomModule 분기는 3안 경로를 지울 때 함께 걷어냈다 (main 브랜치 참고).
         var cell = GetComponentInParent<GridCell>();
         if (cell != null) return cell.transform;
 

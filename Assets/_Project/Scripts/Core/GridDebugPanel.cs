@@ -4,11 +4,18 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// 3x3 격자 전용 상태 표시판. <see cref="GridManager"/>와 같은 오브젝트에 붙인다.
 ///
-/// ── 왜 DebugPanel과 따로 두나 ─────────────────────────
-/// 기존 <see cref="DebugPanel"/>은 <b>GameManager와 한 몸</b>이라(같은 오브젝트에
-/// 붙어 있고, <c>GameManager.Instance</c>가 null이면 통째로 침묵한다) 격자만 켜고
-/// 3안을 꺼둔 지금은 아무것도 보여주지 못한다. 격자 작업은 <b>GameManager 없이도</b>
-/// 검증할 수 있어야 단독으로 굴릴 수 있으므로, 격자 쪽 눈은 따로 만든다.
+/// ── 옛 DebugPanel을 흡수했다 ──────────────────────────
+/// 원래 표시판이 둘이었다. 옛 <c>DebugPanel</c>은 <b>GameManager와 한 몸</b>이라
+/// (같은 오브젝트에 붙어 있고, <c>GameManager.Instance</c>가 null이면 통째로 침묵한다)
+/// 격자만 켜고 3안을 꺼둔 동안은 아무것도 보여주지 못했고, 그래서 격자 쪽 눈을
+/// 따로 만든 것이 이 클래스다.
+///
+/// 3안 경로를 제거할 때 <c>DebugPanel</c>도 지웠고, <b>격자에서도 쓸모 있는 것만</b>
+/// 여기로 옮겼다 — 단축키 F1/F2/F4와 진행도·누적 오답·피신 상태 줄. F3(다음 방)은
+/// 3안의 암전+순간이동 전용이라 버렸다.
+///
+/// <b>GameManager가 없어도 격자 줄은 그대로 뜬다</b>는 성질은 유지한다. 판정 쪽 줄만
+/// "GameManager 없음"으로 표시된다 — 격자 단독 검증이 이 표시판의 존재 이유다.
 ///
 /// ── 무엇을 보여주는가 ────────────────────────────────
 /// 이 격자의 사고는 대부분 <b>화면에 안 나타난다.</b> 재활용은 원래 안 보여야
@@ -31,13 +38,34 @@ public class GridDebugPanel : MonoBehaviour
     private static readonly string[] DirectionNames = { "N", "E", "S", "W" };
 
     [Header("On / Off")]
-    [Tooltip("화면 좌상단 격자 표시판을 보여준다.")]
+    [Tooltip("화면 좌상단 격자 표시판(개발용 — 정답이 그대로 보인다)을 보여준다.")]
     [SerializeField] private bool showOverlay = true;
-    [Tooltip("표시판을 껐다 켜는 키.")]
+    [Tooltip("개발용 표시판을 껐다 켜는 키.")]
     [SerializeField] private Key toggleKey = Key.F6;
 
+    // 추가 생성 — 시연용 뷰. 개발용과 <b>따로</b> 켜고 끈다.
+    // 녹화할 때는 F6을 끄고 F7만 켠다 (개발용은 정답을 노출해서 시연에 못 쓴다).
+    [Header("시연 뷰 (정답을 안 보여준다)")]
+    [Tooltip("격자 그림 + 재활용된 줄 + 은폐 위반 횟수만 보여준다. 영상·빌드 시연용.")]
+    [SerializeField] private bool showDemoView;
+    [Tooltip("시연 뷰를 껐다 켜는 키.")]
+    [SerializeField] private Key demoKey = Key.F7;
+    [Tooltip("은폐 검사기. 비우면 같은 오브젝트에서 자동으로 찾는다. 없으면 위반 줄만 빠진다.")]
+    [SerializeField] private CoverageAudit coverageAudit;
+
+    [Header("검사 허용치")]
     [Tooltip("지오메트리가 칸 몫을 이만큼 넘어가면 경고한다 (m). 벽 두께만큼은 봐준다.")]
     [SerializeField] private float sizeTolerance = 0.5f;
+
+    // 추가 생성 — 옛 DebugPanel에서 옮겨온 단축키. 격자에서도 그대로 유효하다.
+    // 특히 F2는 "누적 오답 3회 → 그것 등장"을 손으로 세 번 틀리지 않고 검증하는 수단이다.
+    [Header("단축키 (GameManager가 있을 때만 동작)")]
+    [Tooltip("이번 칸을 무조건 정답으로 판정.")]
+    [SerializeField] private Key correctKey = Key.F1;
+    [Tooltip("이번 칸을 무조건 오답으로 판정. 세 번 누르면 다음 칸에 '그것'이 선다.")]
+    [SerializeField] private Key wrongKey = Key.F2;
+    [Tooltip("이번 칸 이상현상을 즉시 '그것'으로 교체(추격자를 눈앞에 세운다).")]
+    [SerializeField] private Key stalkerKey = Key.F4;
 
     private GridManager grid;
     private Transform player;
@@ -55,18 +83,50 @@ public class GridDebugPanel : MonoBehaviour
     private void Awake()
     {
         grid = GetComponent<GridManager>();
+
+        // 추가 생성 — 검사기는 보통 같은 오브젝트에 함께 붙는다. 연결을 잊어
+        // 위반 줄만 조용히 사라지는 사고를 막기 위해 자동으로 찾는다
+        // (AnomalyManager가 자식에서 Anomaly를 모으는 것과 같은 발상).
+        if (coverageAudit == null) coverageAudit = GetComponent<CoverageAudit>();
     }
 
     private void Update()
     {
         var kb = Keyboard.current;
-        if (kb != null && kb[toggleKey].wasPressedThisFrame)
+        if (kb == null) return;
+
+        if (kb[toggleKey].wasPressedThisFrame)
             showOverlay = !showOverlay;
+
+        // 추가 생성 — 시연 뷰는 개발용과 독립이다. 둘 다 켜도 되고(아래로 쌓인다),
+        // 녹화할 때는 F6만 꺼서 정답을 가린다.
+        if (kb[demoKey].wasPressedThisFrame)
+            showDemoView = !showDemoView;
+
+        // 추가 생성 — 옛 DebugPanel의 판정 단축키. GameManager가 없으면 격자만 돌고 있는
+        // 상태라 판정할 대상 자체가 없으므로 조용히 넘어간다 (격자 단독 동작 유지).
+        var gm = GameManager.Instance;
+        if (gm == null) return;
+
+        if (kb[correctKey].wasPressedThisFrame)
+        {
+            gm.Judge(gm.CurrentRoomHasAnomaly);
+            Debug.Log("[Debug] 강제 정답");
+        }
+        if (kb[wrongKey].wasPressedThisFrame)
+        {
+            gm.Judge(!gm.CurrentRoomHasAnomaly);
+            Debug.Log("[Debug] 강제 오답");
+        }
+        if (kb[stalkerKey].wasPressedThisFrame)
+        {
+            gm.DebugMakeStalkerAnomaly();
+        }
     }
 
     private void OnGUI()
     {
-        if (!showOverlay || grid == null) return;
+        if (grid == null) return;
 
         style ??= new GUIStyle(GUI.skin.label)
         {
@@ -76,20 +136,86 @@ public class GridDebugPanel : MonoBehaviour
             wordWrap = false,   // 끄지 않으면 아래 CalcSize가 줄바꿈을 잘못 세어 판이 어긋난다
         };
 
-        string text =
-            $"<b>[GRID]</b>  F6 표시 끄기\n" +
-            SpacingLine() + "\n" +
-            SizeLine() + "\n" +
-            CenterLine() + "\n" +
-            AnomalyLine() + "\n" +
-            RecycleLine() + "\n" +
-            WiringLine() + "\n" +
-            MiniMap();
-
-        var size = style.CalcSize(new GUIContent(text));
-        GUI.Box(new Rect(8, 8, size.x + 24, size.y + 16), GUIContent.none);
-        GUI.Label(new Rect(16, 12, size.x + 8, size.y + 8), text, style);
+        // 추가 생성 — 판이 둘이 됐다. 둘 다 켜져도 겹치지 않게 아래로 쌓는다.
+        float y = 8f;
+        if (showOverlay) y = DrawPanel(y, DebugText());
+        if (showDemoView) y = DrawPanel(y, DemoText());
     }
+
+    /// <summary>개발용 표시판 — 격자 수치 전부 + 판정 상태 + <b>정답</b>.</summary>
+    private string DebugText() =>
+        "<b>[GRID]</b>  F6 끄기 / F7 시연 뷰 / F1 정답 / F2 오답 / F4 그것 소환\n" +
+        SpacingLine() + "\n" +
+        SizeLine() + "\n" +
+        CenterLine() + "\n" +
+        ProgressLine() + "\n" +      // 추가 생성 — 옛 DebugPanel에서 옮겨옴
+        AnomalyLine() + "\n" +
+        RecycleLine() + "\n" +
+        WiringLine() + "\n" +
+        StalkerLine() + "\n" +       // 추가 생성 — 옛 DebugPanel에서 옮겨옴
+        MiniMap();
+
+    // 추가 생성 ──────────────────────────────────────────────────────────────
+    /// <summary>
+    /// 시연용 뷰 — <b>원리만</b> 보여준다.
+    ///
+    /// ── 왜 따로 만들었나 ──────────────────────────────────
+    /// 원리를 보여주는 수단이 둘 있었는데 둘 다 시연에 못 썼다.
+    ///  • <c>GridManager.OnDrawGizmos()</c> — <b>Scene 뷰 전용.</b> 빌드한 실행
+    ///    파일에는 아예 없다. 즉 포폴을 직접 돌려보는 사람에겐 안 보인다
+    ///  • 위 개발용 표시판 — <see cref="AnomalyLine"/>이 <b>정답을 그대로 노출</b>한다.
+    ///    띄워놓고 녹화하면 "이상현상을 관찰해서 찾는다"는 게임 자체가 무의미해진다
+    ///
+    /// 그래서 <b>정답을 뺀 격자 그림</b>만 따로 둔다. 이게 켜져 있으면 게임 화면
+    /// 하나에 <b>착시(게임뷰)와 원리(격자 그림)가 같이</b> 들어온다 — 전에는 Scene 뷰와
+    /// Game 뷰를 나란히 띄운 2분할 영상이 필요했고, 보는 사람이 어디를 봐야 할지
+    /// 헷갈렸다.
+    /// </summary>
+    private string DemoText()
+    {
+        // 제목에 한 변을 박지 않고 계산해서 쓴다 — 한 변을 5로 바꿔 시연할 때
+        // 제목만 "3x3"으로 남아 보는 사람을 헷갈리게 하지 않도록.
+        int n = grid.Radius * 2 + 1;
+
+        return $"<b>[{n}x{n} 무한 재활용 격자]</b>  F7 끄기\n" +
+               RecycleLine() + "\n" +
+               CoverageLine() + "\n" +
+               MiniMap();
+    }
+
+    /// <summary>
+    /// 은폐 검사 결과 — <b>이 포폴에서 제일 중요한 한 줄.</b>
+    ///
+    /// "재활용이 안 보인다"는 이 격자의 핵심 주장인데, 여태 근거는 사람이 눈으로
+    /// 보고 "안 보이네" 한 것이 전부였다. <see cref="CoverageAudit"/>가 재활용이
+    /// 일어나는 프레임마다 실제로 가려져 있었는지 검사하므로, 이 줄은 <b>주장이
+    /// 아니라 결과</b>다.
+    /// </summary>
+    private string CoverageLine()
+    {
+        if (coverageAudit == null)
+            return "은폐  <color=#ffcc55>검사기 없음 — GridManager에 CoverageAudit을 붙일 것</color>";
+
+        if (coverageAudit.CheckCount == 0)
+            return "은폐  <color=#ffcc55>아직 검사 없음</color> — 옆 칸으로 넘어가면 검사된다";
+
+        if (coverageAudit.ViolationCount == 0)
+            return $"은폐  <color=#77dd77><b>위반 0회</b></color>   (검사 {coverageAudit.CheckCount}회 통과)";
+
+        return $"은폐  <color=#ff5555><b>위반 {coverageAudit.ViolationCount}회</b></color>   " +
+               $"(검사 {coverageAudit.CheckCount}회)\n" +
+               $"마지막  <color=#ff5555>{coverageAudit.LastViolation}</color>";
+    }
+
+    /// <summary>판 하나를 그리고 <b>다음 판이 시작할 Y</b>를 돌려준다.</summary>
+    private float DrawPanel(float y, string text)
+    {
+        var size = style.CalcSize(new GUIContent(text));
+        GUI.Box(new Rect(8, y, size.x + 24, size.y + 16), GUIContent.none);
+        GUI.Label(new Rect(16, y + 4, size.x + 8, size.y + 8), text, style);
+        return y + size.y + 24;
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     /// <summary>실측된 칸 간격. 0이면 소켓이 없어 재기에 실패한 것이라 전부 한 자리에 겹친다.</summary>
     private string SpacingLine()
@@ -180,6 +306,52 @@ public class GridDebugPanel : MonoBehaviour
         return $"이상현상  <color={color}><b>{label}</b></color>";
     }
 
+    // 추가 생성 ──────────────────────────────────────────────────────────────
+    /// <summary>
+    /// 진행도 · 누적 오답 · 판정 여부 (옛 DebugPanel에서 옮겨옴).
+    ///
+    /// <b>누적 오답 줄이 핵심이다.</b> 이 값이 기준에 닿으면 다음 칸에 '그것'이
+    /// 서야 하는데, 그게 실제로 일어났는지는 그 칸에 걸어 들어가 봐야 안다.
+    /// 숫자로 보면 "지금 3/3인데 왜 안 나오나"를 바로 가를 수 있다.
+    /// </summary>
+    private string ProgressLine()
+    {
+        var gm = GameManager.Instance;
+        if (gm == null) return "진행도  <color=#ffcc55>GameManager 없음 — 격자만 돌고 있다</color>";
+
+        // 기준에 닿았으면 다음 칸에 그것이 선다는 뜻이라 색으로 띄운다.
+        bool armed = gm.MistakesBeforeStalker > 0 && gm.Mistakes >= gm.MistakesBeforeStalker;
+        string mistakePart = armed
+            ? $"<color=#ff5555>누적 오답 {gm.Mistakes}/{gm.MistakesBeforeStalker} — 다음 칸에 그것</color>"
+            : $"누적 오답 {gm.Mistakes}/{gm.MistakesBeforeStalker}";
+
+        return $"진행도  <b>{gm.Progress}/{gm.ClearGoal}</b>   {mistakePart}   " +
+               $"판정함 {(gm.HasJudged ? "예" : "아니오")}";
+    }
+
+    /// <summary>
+    /// 추격자 상태 + 피신 판정 (옛 DebugPanel에서 옮겨옴).
+    ///
+    /// <see cref="Stalker.DebugState"/>가 "화면 밖 / 보임 / 가림"을 갈라 주는데,
+    /// 그게 없으면 "쳐다봤는데 안 멈춘다"가 <b>화면 밖 판정 탓인지 무언가에 가린
+    /// 탓인지</b> 구분이 안 된다 (추격자 문제 ③을 잡아낸 그 줄이다).
+    /// </summary>
+    private string StalkerLine()
+    {
+        var gm = GameManager.Instance;
+        if (gm == null) return "추격자  <color=#ffcc55>GameManager 없음</color>";
+
+        if (gm.Stalker == null)
+            return "추격자  <color=#ff5555>⚠ GameManager의 Stalker 슬롯이 비어 있다 — '있음'인데 아무것도 안 나타난다</color>";
+
+        string shelter = gm.PlayerIsSheltered
+            ? "<color=#77dd77>안전 (사이 문 닫힘)</color>"
+            : "<color=#ffcc55>노출</color>";
+
+        return $"피신  {shelter}\n추격자  {gm.Stalker.DebugState}";
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     /// <summary>마지막 재활용. 한 칸 넘어갈 때마다 갱신돼야 정상이다.</summary>
     private string RecycleLine()
     {
@@ -231,32 +403,56 @@ public class GridDebugPanel : MonoBehaviour
     }
 
     /// <summary>
-    /// 3x3을 좌표 그대로 그린다. 재활용이 "배열이 한 칸 굴러가는" 것이라,
+    /// 격자를 좌표 그대로 그린다. 재활용이 "배열이 한 칸 굴러가는" 것이라,
     /// 숫자가 통째로 밀려나는 모습이 눈에 보여야 의도대로 도는지 알 수 있다.
+    ///
+    /// 범위는 <see cref="GridManager.Radius"/>를 따른다 — 한 변을 5로 바꾸면
+    /// 이 그림도 5x5로 따라온다(전에는 ±1로 박혀 있어 3x3만 그렸다).
     /// </summary>
     private string MiniMap()
     {
         Vector2Int c = grid.CenterCoord;
+        int r = grid.Radius;   // 추가 생성 — 한 변을 따라간다
         string map = "";
 
         // 위(북 = y+1)가 화면 위로 오게 그린다.
-        for (int y = 1; y >= -1; y--)
+        for (int y = r; y >= -r; y--)
         {
             string row = "  ";
-            for (int x = -1; x <= 1; x++)
+            for (int x = -r; x <= r; x++)
             {
                 var coord = new Vector2Int(c.x + x, c.y + y);
                 bool exists = grid.Cells.ContainsKey(coord);
                 string label = $"{coord.x},{coord.y}";
 
-                if (!exists) row += $"<color=#ff5555>[ 없음 ]</color> ";
-                else if (x == 0 && y == 0) row += $"<b>[{label,5}]</b> ";
+                if (!exists) row += "<color=#ff5555>[ 없음 ]</color> ";
+                else if (x == 0 && y == 0) row += $"<color=#77dd77><b>[{label,5}]</b></color> ";
+                // 추가 생성 — 방금 재활용된 줄을 색으로 띄운다. 숫자가 밀려나는 것만
+                // 봐서는 "어느 줄이 옮겨왔나"가 잘 안 읽혀서, 씬 뷰 기즈모가 2초간
+                // 빨갛게 칠하는 것과 같은 규칙을 글자에도 적용한다.
+                else if (JustRecycled(coord)) row += $"<color=#ff5555> {label,5} </color> ";
                 else row += $" {label,5}  ";
             }
             map += row + "\n";
         }
 
         return map.TrimEnd('\n');
+    }
+
+    /// <summary>
+    /// 이 좌표가 <b>방금(2초 안) 재활용되어 옮겨온 줄</b>에 속하는지 — 추가 생성.
+    /// 판정 규칙은 <c>GridManager.OnDrawGizmos()</c>와 똑같이 맞춘다. 씬 뷰와
+    /// 게임 화면이 서로 다른 줄을 가리키면 둘 중 뭘 믿어야 하는지 알 수 없다.
+    /// </summary>
+    private bool JustRecycled(Vector2Int coord)
+    {
+        var rec = grid.LastRecycle;
+        if (rec.direction == Vector2Int.zero) return false;
+        if (Time.time - rec.time >= 2f) return false;
+
+        int r = grid.Radius;
+        return coord.x >= rec.to.x - r && coord.x <= rec.to.x + r
+            && coord.y >= rec.to.y - r && coord.y <= rec.to.y + r;
     }
 
     private static string NameOf(Vector2Int dir)

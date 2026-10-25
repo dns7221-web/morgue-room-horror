@@ -2,10 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 강사님이 알려준 뱀서식 3x3 무한 맵 재활용을 그대로 구현한 격자 매니저.
-/// <see cref="GridCell"/> 프리팹 하나를 9번 복제해 3x3으로 깔고, 플레이어가
-/// 중앙 칸에서 인접 칸으로 넘어갈 때마다 <b>반대편에 뒤처진 행/열 전체를
-/// 진행 방향 앞쪽으로 재배치</b>한다.
+/// 강사님이 알려준 뱀서식 무한 맵 재활용을 그대로 구현한 격자 매니저.
+/// <see cref="GridCell"/> 프리팹 하나를 한 변(<see cref="Radius"/> 참고, 기본 3)만큼
+/// 복제해 정사각 격자로 깔고, 플레이어가 중앙 칸에서 인접 칸으로 넘어갈 때마다
+/// <b>반대편에 뒤처진 행/열 전체를 진행 방향 앞쪽으로 재배치</b>한다.
 ///
 /// ── 핵심 개념 전환 (구 5안과 다른 점) ─────────────────────
 /// 구 5안(RoomModulePool)은 "플레이어를 매번 시작점으로 순간이동"시켰지만,
@@ -14,12 +14,16 @@ using UnityEngine;
 /// 그대로 두고 타일이 재활용된다.
 ///
 /// ── 은폐 ──────────────────────────────────────────────
-/// 재활용 대상 행/열은 항상 새 중앙에서 최소 2칸 떨어져 있다. "모든 문은
-/// 기본적으로 닫혀 있고, 방금 지나온 문만 열려 있다"는 규칙만 지키면 그
-/// 사이에 닫힌 문이 최소 하나 끼어, 재배치 순간이 시야에 안 걸린다
-/// (Stalker의 SightBlocker 레이어와 같은 발상 — 닫힌 문은 이미 이 게임에서
-/// 불투명하게 다뤄진다). 그래서 <see cref="OnPlayerEnteredCell"/>이 방금
-/// 들어온 문을 곧장 닫는다.
+/// 재활용 대상 행/열은 항상 새 중앙에서 최소 <c>Radius + 1</c>칸 떨어져 있다
+/// (기본 3x3이면 2칸). "모든 문은 기본적으로 닫혀 있고, 방금 지나온 문만 열려
+/// 있다"는 규칙만 지키면 그 사이에 닫힌 문이 최소 하나 끼어, 재배치 순간이
+/// 시야에 안 걸린다 (Stalker의 SightBlocker 레이어와 같은 발상 — 닫힌 문은 이미
+/// 이 게임에서 불투명하게 다뤄진다). 그래서 <see cref="OnPlayerEnteredCell"/>이
+/// 방금 들어온 문을 곧장 닫는다.
+///
+/// ⚠️ 이건 오래도록 <b>검사되지 않는 가정</b>이었다 — 사람이 눈으로 보고 "안 보이네"
+/// 한 것이 전부였다. 지금은 <see cref="CoverageAudit"/>가 재활용이 일어나는 프레임마다
+/// 실제로 가려져 있었는지 검사해서, 주장이 아니라 결과(위반 횟수)로 남긴다.
 ///
 /// ── 좌표→월드 변환은 UnityEngine.Grid에 맡긴다 ────────────
 /// 직접 벡터 수식을 계산하는 대신 유니티 내장 Grid 컴포넌트의
@@ -38,11 +42,53 @@ public class GridManager : MonoBehaviour
     private static readonly Vector2Int West = new(-1, 0);
 
     [Header("Setup")]
-    [Tooltip("복제해서 3x3으로 깔 격자 칸 프리팹. 사방 소켓·문이 전부 있어야 한다.")]
+    [Tooltip("복제해서 깔 격자 칸 프리팹. 사방 소켓·문이 전부 있어야 한다.")]
     [SerializeField] private GridCell cellPrefab;
+
+    // 추가 생성 — 한 변을 필드로 뺐다. 전에는 3이 네 군데(생성 범위 ±1, 뒤처짐 2,
+    // 이동량 3, 줄 길이 ±1)에 매직 넘버로 흩어져 있어서, 읽는 사람이 그 1·2·3의
+    // 관계를 좌표를 그려가며 복원해야 했다. 아래 Radius 하나에서 전부 유도하면
+    // 그 관계가 코드에 그대로 적힌다.
+    [Tooltip("한 변의 칸 수. 중앙 칸이 생기려면 홀수여야 한다. 3이 최소.")]
+    [SerializeField, Min(3)] private int gridSize = 3;
+
+    // 추가 생성 — 은폐 검사기. 비워도 격자는 그대로 돈다(GridDebugPanel과 같은 철학:
+    // 검증 장치가 없어도 본체는 혼자 굴러가야 한다).
+    [Tooltip("은폐 검사기. 비우면 같은 오브젝트에서 자동으로 찾는다. 아예 없으면 검사만 안 돌고 격자는 그대로 돈다.")]
+    [SerializeField] private CoverageAudit coverageAudit;
 
     private Grid grid;
     private readonly Dictionary<Vector2Int, GridCell> cells = new();
+
+    // 추가 생성 — 이번에 옮길 칸들. 검사기가 '사라지는 자리'를 먼저 봐야 하므로
+    // 옮기기 전에 한 줄을 통째로 모아 둬야 한다. 한 칸 넘어갈 때 한 번만 쓰는
+    // 목록이라 매번 new하지 않고 재사용한다(GC 부담 0).
+    private readonly List<GridCell> movingCells = new();
+
+    /// <summary>
+    /// 중앙에서 격자 끝까지의 칸 수. 한 변 N에서 <c>(N-1)/2</c>.
+    ///
+    /// ── 왜 3이 최소인가 ───────────────────────────────────
+    /// 재활용되는 줄은 <b>옮기기 전</b> 자리가 새 중앙에서 <c>Radius + 1</c>칸 뒤에
+    /// 있다. N=3이면 2칸 — 그 사이에 경계가 둘, 닫힌 문이 두 짝 끼어 있어 재배치
+    /// 순간이 시야에 안 걸린다. N=1은 이웃 칸이 아예 없어 격자가 성립하지 않으므로
+    /// <b>3이 최소</b>다. N=5면 여유가 3칸으로 늘지만 칸이 9개에서 25개가 된다
+    /// (상시 로드 2.8배) — 여유를 더 살 이유가 없어서 3으로 둔다.
+    /// </summary>
+    public int Radius => (gridSize - 1) / 2;
+
+    /// <summary>
+    /// 짝수를 넣으면 중앙 칸이 조각과 조각 사이 이음매에 와서 격자가 성립하지 않는다.
+    /// 인스펙터에서 바꾸는 즉시 홀수로 보정하고 한 줄 알린다 — 플레이해 보고 나서야
+    /// "9칸이 아니라 16칸이 깔렸다"를 깨닫는 것보다 낫다.
+    /// </summary>
+    private void OnValidate()
+    {
+        if (gridSize % 2 != 0) return;
+
+        gridSize++;
+        Debug.LogWarning($"[GridManager] 한 변은 홀수여야 중앙 칸이 생깁니다 — {gridSize}로 보정했습니다.", this);
+    }
 
     /// <summary>플레이어가 지금 서 있는 칸의 격자 좌표.</summary>
     public Vector2Int CenterCoord { get; private set; }
@@ -80,8 +126,8 @@ public class GridManager : MonoBehaviour
     //
     // GridManager는 "칸이 어디 있는가"만 알고 "그 칸에 뭐가 있어야 하는가"는 모른다
     // (관심사 분리 — GameManager와 같은 철학). 그래서 직접 판정 로직을 부르는 대신
-    // 이벤트만 낸다. 구독자가 없어도(GameManager가 gridMode를 안 켰거나 아직 없어도)
-    // 격자 자체는 그대로 돌아간다.
+    // 이벤트만 낸다. 구독자가 없어도(씬에 GameManager가 아직/아예 없어도)
+    // 격자 자체는 그대로 돌아간다 — 격자를 단독으로 검증할 수 있는 이유다.
 
     /// <summary>3x3 칸이 처음 다 서고 플레이어가 중앙에 놓인 직후, 그 중앙 칸과 함께 딱 한 번 울린다.</summary>
     public event System.Action<GridCell> Initialized;
@@ -97,6 +143,13 @@ public class GridManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         grid = GetComponent<Grid>();
+
+        // 추가 생성 — 검사기는 보통 이 오브젝트에 함께 붙는다. 슬롯 연결을 잊으면
+        // <b>격자는 검사를 안 부르는데 표시판은 검사기를 찾아내</b> "검사 없음"만
+        // 뜨는 어긋난 상태가 된다 — 붙여놨는데 안 도는 종류라 원인을 찾기 어렵다.
+        // AnomalyManager가 자식에서 Anomaly를 모으고 GridCell이 StalkerPoint를
+        // 자동으로 찾는 것과 같은 이유로, 여기서도 찾아 둔다.
+        if (coverageAudit == null) coverageAudit = GetComponent<CoverageAudit>();
     }
 
     private void Start()
@@ -104,14 +157,15 @@ public class GridManager : MonoBehaviour
         Initialize();
     }
 
-    /// <summary>3x3 칸 생성 + 간격 실측 + 배치. 1회만 호출.</summary>
+    /// <summary>칸 생성(한 변 gridSize) + 간격 실측 + 배치. 1회만 호출.</summary>
     public void Initialize()
     {
         MeasureSpacing();
 
-        for (int x = -1; x <= 1; x++)
+        int r = Radius;   // 추가 생성 — 루프 안에서 매번 나눗셈하지 않게 한 번만 받는다
+        for (int x = -r; x <= r; x++)
         {
-            for (int y = -1; y <= 1; y++)
+            for (int y = -r; y <= r; y++)
             {
                 var coord = new Vector2Int(x, y);
                 var cell = Instantiate(cellPrefab, transform);
@@ -196,26 +250,39 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 새 중앙 기준으로 <b>반대편에 2칸 뒤처진 행/열</b>을 진행 방향 3칸
-    /// 앞으로 옮긴다 — "배열이 한 칸 굴러가는" 뱀서 재활용의 실제 계산.
+    /// 새 중앙 기준으로 <b>반대편에 (Radius+1)칸 뒤처진 행/열</b>을 진행 방향으로
+    /// <b>한 변(gridSize)만큼</b> 옮긴다 — "배열이 한 칸 굴러가는" 뱀서 재활용의 실제 계산.
     ///
-    /// dir을 90도 돌린 벡터(perp)로 그 행/열의 나머지 두 칸을 훑는다 —
+    /// ── 숫자가 아니라 관계로 적는다 (추가 생성) ───────────
+    /// 전에는 2와 3이 그대로 박혀 있었다. 둘은 독립된 값이 아니라 한 변 N에서
+    /// 나오는 관계다 — <b>뒤처짐 = R+1</b>, <b>이동량 = 2R+1 = N</b>. 그래서 숫자를
+    /// 지우고 관계를 적었다. 한 변을 5로 바꿔도 이 함수는 그대로 맞는다.
+    ///
+    /// <b>이동량이 왜 N인가 —</b> 옮기기 전 그 줄은 새 중앙 기준 상대좌표 −(R+1)에
+    /// 있고, 가야 할 자리는 격자의 맨 앞 +R이다. 둘의 차가 곧 N이다.
+    ///
+    /// dir을 90도 돌린 벡터(perp)로 그 행/열의 나머지 칸을 훑는다 —
     /// 가로 이동이든 세로 이동이든 같은 코드로 처리된다(축을 나눠 분기하지 않음).
     /// </summary>
     private void RecycleTrailingLine(Vector2Int dir)
     {
+        int r = Radius;
         Vector2Int perp = new(-dir.y, dir.x);
-        Vector2Int edgeBase = CenterCoord - dir * 2; // 새 중앙 기준 뒤처진 행/열의 대표 좌표
+        Vector2Int edgeBase = CenterCoord - dir * (r + 1); // 새 중앙 기준 뒤처진 행/열의 대표 좌표
 
         LastRecycle = new RecycleRecord
         {
             direction = dir,
             from = edgeBase,
-            to = edgeBase + dir * 3,
+            to = edgeBase + dir * gridSize,
             time = Time.time,
         };
 
-        for (int i = -1; i <= 1; i++)
+        // ── 1) 옮길 칸을 먼저 모은다 (추가 생성) ───────────────────────────
+        // 검사기가 '사라지는 자리'를 봐야 하는데, 옮기기 시작하면 그 자리가 이미
+        // 없다. 이 시점의 cell.Coord는 아직 <b>옛 좌표</b>라 검사기가 그대로 읽는다.
+        movingCells.Clear();
+        for (int i = -r; i <= r; i++)
         {
             Vector2Int oldCoord = edgeBase + perp * i;
             if (!cells.TryGetValue(oldCoord, out var cell))
@@ -223,14 +290,29 @@ public class GridManager : MonoBehaviour
                 Debug.LogError($"[GridManager] 재활용 대상 칸이 없습니다: {oldCoord}", this);
                 continue;
             }
+            movingCells.Add(cell);
+        }
 
-            Vector2Int newCoord = oldCoord + dir * 3;
+        // ── 2) 사라지는 자리가 가려져 있었는지 (추가 생성) ─────────────────
+        coverageAudit?.Check(movingCells, CenterCoord, CoverageAudit.Phase.Leaving);
+
+        // ── 3) 실제로 옮긴다 ──────────────────────────────────────────────
+        foreach (var cell in movingCells)
+        {
+            Vector2Int oldCoord = cell.Coord;
+            Vector2Int newCoord = oldCoord + dir * gridSize;
+
             cells.Remove(oldCoord);
             cells[newCoord] = cell;
             cell.Coord = newCoord;
             PlaceCell(cell, newCoord);
             CellRecycled?.Invoke(cell);
         }
+
+        // ── 4) 나타난 자리도 가려져 있는지 (추가 생성) ─────────────────────
+        // 직후만 봐도 될 것 같지만 아니다 — 둘은 다른 사건이다. 2번은 "사라지는
+        // 걸 봤는가", 4번은 "나타나는 걸 봤는가"를 검사한다. 하나만 두면 반쪽이다.
+        coverageAudit?.Check(movingCells, CenterCoord, CoverageAudit.Phase.Arriving);
     }
 
     /// <summary>
@@ -295,6 +377,39 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
+    /// <paramref name="from"/> 칸에서 <paramref name="target"/> 칸 쪽으로 나가는
+    /// <b>첫 경계</b>의 문이 전부 닫혀 있는지 — 은폐 검사(<see cref="CoverageAudit"/>)가 쓴다.
+    ///
+    /// ── 왜 '첫 경계'만 보나 ───────────────────────────────
+    /// "그 칸이 안 보인다"를 엄밀히 따지면 두 칸 사이 모든 경로를 훑어야 하지만,
+    /// 그럴 필요가 없다. 플레이어가 선 칸에서 <b>그 방향으로 나가는 문이 닫혀 있으면</b>
+    /// 그 방향으로는 아무것도 볼 수 없다 — 더 멀리 있는 것도 당연히 못 본다.
+    ///
+    /// 대각선 칸은 첫 걸음이 둘(가로·세로)이라 <b>둘 다 닫혀 있어야</b> 막힌 것으로 본다.
+    /// 한쪽이라도 열려 있으면 "볼 수 있을지도 모른다"로 넘기고, 실제로 보였는지는
+    /// 검사기가 시야 판정으로 확인한다. 틀리는 쪽이 <b>더 엄격한 쪽</b>이라 안전하다.
+    /// </summary>
+    public bool IsSealedToward(Vector2Int from, Vector2Int target)
+    {
+        Vector2Int delta = target - from;
+        if (delta == Vector2Int.zero) return false;   // 자기 칸은 사이에 끼울 문이 없다
+
+        if (delta.x != 0)
+        {
+            var step = new Vector2Int(delta.x > 0 ? 1 : -1, 0);
+            if (!AreBoundaryDoorsClosed(from, from + step)) return false;
+        }
+
+        if (delta.y != 0)
+        {
+            var step = new Vector2Int(0, delta.y > 0 ? 1 : -1);
+            if (!AreBoundaryDoorsClosed(from, from + step)) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// a에서 dir 방향 경계의 문을 찾는다. 문짝은 북·동에만 있어(SetCellExitsLocked 참고)
     /// 남·서쪽 경계는 <b>이웃 칸이 반대쪽(북·동)으로 들고 있는 문</b>을 대신 찾는다.
     /// </summary>
@@ -342,11 +457,13 @@ public class GridManager : MonoBehaviour
         {
             if (kv.Value == null) continue;
 
+            // 방금 옮겨온 줄: to를 중심으로 한 변만큼 퍼져 있다 (±Radius).
+            int r = Radius;
             bool isCenter = kv.Key == CenterCoord;
             bool justMoved = LastRecycle.direction != Vector2Int.zero
                           && Time.time - LastRecycle.time < 2f
-                          && kv.Key.x >= LastRecycle.to.x - 1 && kv.Key.x <= LastRecycle.to.x + 1
-                          && kv.Key.y >= LastRecycle.to.y - 1 && kv.Key.y <= LastRecycle.to.y + 1;
+                          && kv.Key.x >= LastRecycle.to.x - r && kv.Key.x <= LastRecycle.to.x + r
+                          && kv.Key.y >= LastRecycle.to.y - r && kv.Key.y <= LastRecycle.to.y + r;
 
             Gizmos.color = justMoved ? Color.red
                          : isCenter ? Color.green
