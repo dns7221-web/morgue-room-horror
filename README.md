@@ -252,7 +252,9 @@
       · **도구에서 프로젝트 전용 코드를 걷어냈다** — `RegisterMarker`로 프로젝트가 자기 구간을
         등록하는 방향으로 뒤집어, 어느 작업물에 떨어뜨려도 손댈 데가 없게 했다 (패키지화 대비)
       · 이 프로젝트 마커 4개 계기화 — 재활용 / 은폐 검사 / 이상현상 재추첨 / 추격자 시야
-      · [ ] 🔜 UPM 패키지로 떼어내 Momentum과 공유 (아래 "렉 미터 이식" 참고)
+      · [x] **UPM 패키지로 떼어냄** — [unity-lagmeter](https://github.com/dns7221-web/unity-lagmeter) (태그 `1.0.0`)
+        이 프로젝트는 `Packages/manifest.json`으로 물고 있고, `Assets/` 사본은 지웠다
+      · [ ] 🔜 Momentum도 같은 패키지로 전환 (지금은 양쪽에 사본이 둘)
 - [ ] 게임뷰 + 씬뷰 동시 시연 영상 정리 ← **포폴 전체 완성 후**
       · ⚠️ **3안 영상을 아직 안 찍었다.** "격자가 막히면 이것이 포폴"이라 보험으로 정해뒀던
         0번 항목인데 건너뛰고 착수했다. 이 브랜치는 3안 코드를 지웠으므로 `main`에서,
@@ -1239,20 +1241,56 @@ LagMeterRows.cs   이 프로젝트가 자기 구간을 소개한다            �
 > **다음 수 —** `gridSize`를 3과 5로 각각 F9 녹화해 CSV를 비교하면 「왜 3이면 충분한가」가
 > 수식(`R+1`칸 여유)에 이어 **수치**로도 채워진다. 한 변을 필드로 뺀 것이 여기서 쓰인다.
 
-##### 🔜 다음: UPM 패키지로 떼어내기
+##### ✅ UPM 패키지로 떼어냈다 — 이제 이 프로젝트도 패키지를 물고 있다
 
-같은 도구를 앞으로 만들 작업물에도 넣는다면 매번 복사하는 건 답이 아니다. 지금 구조
-(`LagMeter`에 프로젝트 전용 코드가 없음)면 **UPM 패키지로 떼어내는 게 거의 공짜**다.
+같은 도구를 앞으로 만들 작업물에도 넣는다면 매번 복사하는 건 답이 아니다. 그래서
+별 저장소로 떼어내 **UPM 패키지**로 만들었다.
 
-| 단계 | |
+> **https://github.com/dns7221-web/unity-lagmeter** (태그 `1.0.0`)
+
+이 프로젝트는 이제 `Packages/manifest.json`으로 그걸 물고 있다. `Assets/` 안의 사본은
+지웠고, 남은 건 **이 프로젝트 전용 파일 하나**(`LagMeterRows.cs`)뿐이다.
+
+```jsonc
+"com.dhs.lagmeter": "https://github.com/dns7221-web/unity-lagmeter.git#1.0.0",
+```
+
+**`#1.0.0` 태그를 박은 이유 —** 브랜치로 물면 패키지를 고치는 순간 이 프로젝트가 같이
+바뀐다. 포폴은 "어제 되던 게 오늘도 된다"가 중요하므로 버전을 고정하고, 당길 준비가
+됐을 때 태그만 올린다.
+
+| 구조 | |
 |---|---|
-| 1 | 작은 저장소 하나 — `package.json` + `Runtime/`(LagMeter.cs + asmdef) + `Editor/`(메뉴 + asmdef) |
-| 2 | asmdef에 `Unity.InputSystem` 참조를 **명시**해야 한다 — `Assets/` 안에서는 암시적으로 다 참조되지만 패키지는 직접 적어야 한다 |
-| 3 | 에디터 메뉴(`Tools/렉 미터/…`) 블록을 `Editor/`로 분리 — 런타임 어셈블리에 `UnityEditor` 참조를 남기지 않기 위해 |
-| 4 | 쓰는 쪽은 Package Manager ▸ **Add package from git URL** 한 번. 업데이트는 태그만 올리면 끝 |
+| `package.json` | `com.dhs.lagmeter`. `com.unity.inputsystem`을 의존성에 적어 자동으로 따라오게 |
+| `Runtime/` | `LagMeter.cs` + `DHS.Diagnostics.asmdef` |
+| `Editor/` | `LagMeterMenu.cs` + `DHS.Diagnostics.Editor.asmdef` (`includePlatforms: ["Editor"]`) |
 
-그러면 Momentum도 자기 사본을 버리고 같은 패키지를 물면 된다 — **고치면 양쪽이 같이 좋아진다.**
-네임스페이스를 이식할 때 이미 `DHS.Diagnostics`(최종 이름)로 박아둔 이유가 이것이다.
+##### 패키지로 만들면서 실제로 걸린 것 셋
+
+**① asmdef에 `Unity.InputSystem`을 명시해야 한다.** `Assets/` 안의 코드는 암시적으로
+모든 패키지를 참조하지만, asmdef를 쓰는 순간 자기 어셈블리가 되어 **직접 적지 않으면
+`Key.F8`에서 컴파일 에러**가 난다. 같은 이유로 `autoReferenced: true`도 유지해야 한다 —
+끄면 프로젝트의 `LagMeterRows.cs`가 `LagMeter.RegisterMarker`를 못 본다.
+
+**② 에디터 메뉴를 갈라내니 `private`이 깨졌다.** 메뉴를 `Editor/`로 옮기자
+`RecordFromStartPrefKey`가 **다른 어셈블리**에서 읽히게 되어 `public`이 되어야 했다.
+한 파일에 `#if UNITY_EDITOR`로 섞어둘 때와 달라지는 자리가 정확히 여기 하나였다 —
+어셈블리 경계가 생기면 `#if`로는 가려지던 접근 범위가 드러난다.
+
+**③ 전환은 한 번에 해야 한다.** 패키지를 추가하면서 `Assets/`의 사본을 안 지우면
+`DHS.Diagnostics.LagMeter`가 **두 번 정의돼 컴파일이 깨진다**(CS0101). 그래서
+"manifest 추가 + 사본 삭제"를 같은 커밋에 넣었다.
+
+> **덤 —** 이식할 때 네임스페이스를 프로젝트 이름이 아니라 **최종 이름**(`DHS.Diagnostics`)으로
+> 박아둔 덕에 패키지화에서 이름 바꾸는 작업이 0이었다. **다음 단계를 알고 있으면 지금
+> 고르는 이름이 달라진다.**
+
+##### 🔜 다음: Momentum도 같은 패키지로
+
+Momentum에는 아직 자기 사본(`Assets/Project/Scripts/Diagnostics/LagMeter.cs`)이 있다.
+그쪽도 패키지를 물게 하면 **고치면 양쪽이 같이 좋아진다.** 전환 절차는 위 ③과 같다 —
+단, Momentum의 `CreateRows()`에 박혀 있던 `PerchPointFinder.Scan` 줄을 그쪽
+`LagMeterRows.cs`로 옮겨야 한다(패키지 쪽엔 프로젝트 전용 줄이 없다).
 
 #### 🔜 다음 할 일
 
