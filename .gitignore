@@ -72,6 +72,9 @@ crashlytics-build.properties
 # ProfilerCaptures
 /[Pp]rofiler[Cc]aptures/
 
+# Unity Recorder가 뽑는 영상 — 한 편이 100MB를 넘어 저장소에 들어가면 안 된다
+/[Rr]ecordings/
+
 # OS generated files
 .DS_Store
 Thumbs.db
