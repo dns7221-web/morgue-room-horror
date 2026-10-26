@@ -1,5 +1,14 @@
 {
   "dependencies": {
+    "com.dhs.lagmeter": {
+      "version": "https://github.com/dns7221-web/unity-lagmeter.git#1.0.0",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.inputsystem": "1.19.0"
+      },
+      "hash": "835babf8bdf03c621687ae02e049b8784a424a1f"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
