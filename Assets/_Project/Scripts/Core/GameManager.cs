@@ -45,6 +45,9 @@ public class GameManager : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float anomalyChance = 0.5f;
     [Tooltip("이 횟수만큼 누적으로 틀리면 추격자가 나타난다. 0이면 등장하지 않는다.")]
     [SerializeField, Min(0)] private int mistakesBeforeStalker = 3;
+    // 추가 생성 (2026-10-26)
+    [Tooltip("떠난 칸을 다시 꾸미기까지 기다리는 시간(초). 문이 닫히는 시간(Door의 Open Duration, 기본 1초)보다 길어야 바뀌는 게 안 보인다.")]
+    [SerializeField, Min(0f)] private float redressDelay = 1.3f;
 
     [Header("Debug")]
     [Tooltip("체크 시 O(있음)/X(없음) 키로 판정 테스트. 판정 UI 만들면 끄면 됨.")]
@@ -57,6 +60,8 @@ public class GameManager : MonoBehaviour
     // 누적 오답 수. progress는 틀릴 때마다 0으로 리셋되므로 '몇 번 틀렸나'를
     // 따로 세야 한다. 추격자 등장 조건에 쓰고, 등장시키면 다시 0으로 돌린다.
     private int mistakes;
+    // 추가 생성 (2026-10-26) — 방금 떠난 칸. 다시 꾸밀 대상을 기억해 둔다.
+    private GridCell previousCell;
 
     /// <summary>
     /// 플레이어가 지금 안전한지 — 추격자 피신 규칙.
@@ -389,6 +394,7 @@ public class GameManager : MonoBehaviour
 
         judged = false;
         mistakes = 0;
+        previousCell = centerCell;   // 추가 생성 (2026-10-26)
 
         // 이상현상이 없는 칸이어도 판정은 반드시 거쳐야 한다 — 무엇이 '정상'인지
         // 관찰해서 X로 확인하는 것 자체가 학습이다.
@@ -402,6 +408,24 @@ public class GameManager : MonoBehaviour
     private void OnGridCenterChanged(GridCell cell)
     {
         judged = false;
+
+        // 추가 생성 (2026-10-26) — 방금 떠난 칸을 다시 꾸민다.
+        //
+        // ── 왜 필요한가 (겪은 버그) ───────────────────────
+        // Dress()는 <b>재활용될 때만</b> 불렸다. 그런데 재활용되는 것은 "뒤처진 줄"뿐이라,
+        // 두 칸을 왔다 갔다 하면 그 두 칸은 <b>영영 뒤처진 줄이 되지 않는다.</b> 결과적으로
+        // 이상현상이 칸에 굳어서, 되돌아가면 늘 같은 것이 나왔다 — "7번은 늘 서랍 열림,
+        // 9번은 늘 없음"처럼. 칸이 아홉 개뿐이라 외우면 판정이 공짜가 되고,
+        // 무엇보다 <b>같은 방을 돌려쓴다는 단서</b>가 된다. 문 흐름을 통일해 없앴던
+        // 그 단서와 같은 종류다.
+        //
+        // ── 왜 바로 안 꾸미고 미루나 ──────────────────────
+        // 이 이벤트는 GridManager가 <b>지나온 문을 닫기 전에</b> 울린다. 지금 꾸미면
+        // 활짝 열린 문 너머에서 이상현상이 바뀌는 것이 보인다. 문이 닫히기를 기다렸다
+        // 꾸민다 — 재활용을 닫힌 문 뒤에 숨기는 것과 같은 규칙이다.
+        if (previousCell != null && previousCell != cell)
+            StartCoroutine(RedressAfterDoorCloses(previousCell));
+        previousCell = cell;
 
         // 판정 전엔 이 칸의 사방 출입문이 전부 잠긴다 — 이상현상을 관찰해서
         // O/X로 답해야 다음 칸으로 나갈 수 있다. Judge()가 판정 직후 다시 푼다.
@@ -430,6 +454,26 @@ public class GameManager : MonoBehaviour
     /// (뒤처진 줄의 대표 좌표 + 진행 방향 × 한 변 == 새 중앙 + 진행 방향).
     /// 새 API를 만들 필요 없이 그걸 그대로 쓴다.
     /// </summary>
+    /// <summary>
+    /// 떠난 칸을 <paramref name="cell"/>, 문이 닫힌 뒤에 새 이상현상으로 바꾼다.
+    ///
+    /// 기다리는 시간은 <see cref="redressDelay"/> — 문이 닫히는 데 걸리는 시간보다
+    /// 길어야 한다(Door의 Open Duration 기본 1초).
+    ///
+    /// <b>되돌아왔으면 하지 않는다.</b> 기다리는 사이 플레이어가 그 칸으로 다시
+    /// 들어왔을 수 있는데, 그때 꾸미면 눈앞에서 이상현상이 바뀐다 — 고치려던 것보다
+    /// 더 나쁜 단서가 된다.
+    /// </summary>
+    private System.Collections.IEnumerator RedressAfterDoorCloses(GridCell cell)
+    {
+        yield return new WaitForSeconds(redressDelay);
+
+        if (cell == null || GridManager.Instance == null) yield break;
+        if (GridManager.Instance.CenterCell == cell) yield break;   // 되돌아왔다 — 건드리지 않는다
+
+        Dress(cell, false);   // '그것'은 앞쪽 칸 몫이다(OnGridCellRecycled 참고)
+    }
+
     private void OnGridCellRecycled(GridCell cell)
     {
         if (cell == null) return;
