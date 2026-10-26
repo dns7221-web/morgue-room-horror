@@ -36,6 +36,16 @@ public class FirstPersonController : MonoBehaviour
     // 추가 생성 (2026-10-26)
     [Tooltip("Shift를 누른 채 <b>앞으로</b> 갈 때 속도 배수. 옆·뒤로는 안 걸린다.")]
     [SerializeField, Range(1f, 3f)] private float dashMultiplier = 1.8f;
+
+    [Header("스태미너")]
+    [Tooltip("쉬지 않고 대쉬할 수 있는 시간(초). 이 값이 곧 '한 번에 도망칠 수 있는 거리'다.")]
+    [Min(0.5f)][SerializeField] private float maxStamina = 3.5f;
+    [Tooltip("초당 회복량. 1이면 쓴 만큼 그대로 걸려 회복된다 — 1보다 작게 둬야 대쉬가 아껴 쓰는 자원이 된다.")]
+    [Min(0.05f)][SerializeField] private float staminaRegenPerSecond = 0.55f;
+    [Tooltip("대쉬를 멈춘 뒤 회복이 시작되기까지 기다리는 시간(초). 0이면 떼자마자 찬다.")]
+    [Min(0f)][SerializeField] private float staminaRegenDelay = 0.8f;
+    [Tooltip("바닥까지 쓰고 나면 이 비율만큼 차야 다시 대쉬할 수 있다. 0이면 1프레임씩 끊어 쓰는 '딸깍 대쉬'가 된다.")]
+    [Range(0f, 1f)][SerializeField] private float staminaRecoverThreshold = 0.35f;
     [Tooltip("중력 가속도 (m/s²). 음수.")]
     [SerializeField] private float gravity = -9.81f;
 
@@ -58,6 +68,52 @@ public class FirstPersonController : MonoBehaviour
     private InputAction moveAction;
     private InputAction lookAction;
     private InputAction dashAction;   // 추가 생성 (2026-10-26)
+
+    // ── 스태미너 (추가 생성 2026-10-26) ─────────────────────────────────────
+    private float stamina;
+    private float regenBlockedUntil;   // 이 시각까지는 회복하지 않는다(대쉬를 뗀 직후)
+    private bool exhausted;            // 바닥까지 썼다 — 일정 비율 찰 때까지 대쉬 금지
+
+    /// <summary>남은 스태미너 (0~1). 표시만 하는 쪽(StaminaUI)이 읽어간다.</summary>
+    public float StaminaNormalized => maxStamina > 0f ? stamina / maxStamina : 0f;
+
+    /// <summary>지금 바닥나서 못 쓰는 상태인지 (UI가 색으로 알리는 데 쓴다).</summary>
+    public bool StaminaExhausted => exhausted;
+
+    /// <summary>이번 프레임에 실제로 대쉬 중인지 (UI·사운드가 읽어간다).</summary>
+    public bool IsDashing { get; private set; }
+
+    /// <summary>
+    /// 이번 프레임 대쉬에 스태미너를 쓴다. 모자라면 false — 호출부가 평속으로 간다.
+    ///
+    /// <b>exhausted 플래그가 필요한 이유</b>: 0까지 쓰고도 Shift를 누르고 있으면, 회복된
+    /// 한 프레임치를 곧바로 써버려 <b>1프레임씩 끊어 가는 '딸깍 대쉬'</b>가 된다. 겉보기엔
+    /// 느린 대쉬가 영원히 되는 셈이라 자원이 아니게 된다. 그래서 바닥을 치면 잠그고,
+    /// <see cref="staminaRecoverThreshold"/>만큼 찰 때까지 열어주지 않는다.
+    /// </summary>
+    private bool TrySpendStamina()
+    {
+        if (exhausted) return false;
+
+        stamina -= Time.deltaTime;
+        regenBlockedUntil = Time.time + staminaRegenDelay;
+
+        if (stamina > 0f) return true;
+
+        stamina = 0f;
+        exhausted = true;
+        return false;
+    }
+
+    /// <summary>대쉬를 안 쓰는 동안 회복. 바닥을 쳤으면 기준치까지 차야 잠금이 풀린다.</summary>
+    private void RegenStamina()
+    {
+        if (stamina >= maxStamina || Time.time < regenBlockedUntil) return;
+
+        stamina = Mathf.Min(maxStamina, stamina + staminaRegenPerSecond * Time.deltaTime);
+
+        if (exhausted && stamina >= maxStamina * staminaRecoverThreshold) exhausted = false;
+    }
 
     private float pitch;              // 누적된 상하 시점 각도 (Clamp 대상)
     private float verticalVelocity;   // 중력에 의한 수직 속도
@@ -82,6 +138,7 @@ public class FirstPersonController : MonoBehaviour
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+        stamina = maxStamina;   // 추가 생성 (2026-10-26) — 가득 찬 채로 시작한다
 
         // WASD 네 키를 하나의 Vector2로 합성한다.
         moveAction = new InputAction("Move", InputActionType.Value, expectedControlType: "Vector2");
@@ -137,6 +194,10 @@ public class FirstPersonController : MonoBehaviour
         if (ControlsLocked)
         {
             IsMoving = false;   // 손 애니메이션도 Idle로
+            // 추가 생성 (2026-10-26) — 판정 UI를 보는 동안에도 숨은 고른다.
+            // 키패드 앞에 선 시간이 회복 시간이 되는 셈이라, 판정이 쉼표 역할을 한다.
+            IsDashing = false;
+            RegenStamina();
             return;
         }
 
@@ -186,7 +247,9 @@ public class FirstPersonController : MonoBehaviour
         // 옆·뒤까지 빨라지면 추격자를 쳐다보며 물러나는 것이 공짜가 되어, "돌아보면
         // 멈출 수 있지만 내 발도 느려진다"는 딜레마가 사라진다. 뒷걸음 감속과 같은 이유로
         // 앞으로만 준다 — 도망은 빨라지되 <b>등을 보여야</b> 빨라진다.
-        bool dashing = input.y > 0f && dashAction.IsPressed();
+        bool dashing = input.y > 0f && dashAction.IsPressed() && TrySpendStamina();
+        IsDashing = dashing;
+        if (!dashing) RegenStamina();
         float speed = input.y < 0f ? moveSpeed * backwardSpeedMultiplier
                     : dashing ? moveSpeed * dashMultiplier
                     : moveSpeed;
