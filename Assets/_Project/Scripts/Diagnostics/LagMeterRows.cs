@@ -32,6 +32,12 @@ public static class LagMeterRows
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Register()
     {
+        // 정적 필드는 도메인 리로드를 끄면 Play 사이에 남는다. Time.frameCount는 Play마다
+        // 0부터 다시 세므로, 지난 Play에서 미뤄둔 프레임 번호가 남아 있으면 이번 Play 초반에
+        // 몇 초간 검사기를 안 찾는다. 등록 때 함께 초기화한다.
+        s_audit = null;
+        s_nextLookupFrame = 0;
+
         // ── 격자 재활용 ───────────────────────────────────────────────────
         // 이 포폴의 핵심 주장이 "끊김 없이 걸어서 넘어간다"인데, 재활용이 무거우면 그 프레임이
         // 튀어서 주장 자체가 깨진다. 지금까지는 안 튀는 것을 <b>눈으로만</b> 확인했다.
@@ -48,6 +54,40 @@ public static class LagMeterRows
         // 위 셋은 한 칸 넘어갈 때 한 번이지만, 이것은 <b>매 프레임</b> 돈다(절두체 + 표본점 Linecast).
         // 상시 비용은 이쪽이라, 둘을 같은 표에서 보는 것이 의미가 있다.
         LagMeter.RegisterMarker("Stalker.Sight", "추격자 시야", UpdateStep);
+
+        // ── 은폐 검사 결과 (추가 생성 2026-10-26) ─────────────────────────
+        // 이 포폴의 핵심 주장이 "재활용이 안 보인다"인데, 그 숫자가 F7 시연 뷰에
+        // <b>실시간으로만</b> 보여서 녹화 파일에는 남지 않았다. 15칸 걷고 나서
+        // "위반 0회였다"를 파일로 증명할 수가 없다는 뜻이다 — 제일 중요한 숫자인데도.
+        //
+        // 시간(ms)이 아니라 개수라서 ProfilerMarker로는 못 싣는다. 그래서 1.1.0에
+        // 생긴 RegisterCounter로 CSV 열을 하나씩 받는다.
+        LagMeter.RegisterCounter("CoverageViolations", "은폐 위반", () => Audit != null ? Audit.ViolationCount : 0f);
+        LagMeter.RegisterCounter("CoverageChecks", "은폐 검사", () => Audit != null ? Audit.CheckCount : 0f);
+    }
+
+    // 추가 생성 (2026-10-26) ─────────────────────────────────────────────────
+    //
+    // 위 람다는 <b>매 프레임</b> 불린다. 그래서 FindAnyObjectByType를 그대로 쓰면 안 된다 —
+    // 등록은 BeforeSceneLoad에 끝나는데 검사기는 씬이 뜬 뒤에 생기므로, 캐시가 없으면
+    // 못 찾는 동안 매 프레임 씬 전체를 훑는다. 측정 도구가 렉을 만드는 꼴이 된다.
+    //
+    // 그래서 ① 찾으면 캐시하고 ② 못 찾으면 한동안 다시 찾지 않는다.
+    // (검사기가 아예 없는 프로젝트에서도 조용히 0으로 남는다)
+    private static CoverageAudit s_audit;
+    private static int s_nextLookupFrame;
+
+    private static CoverageAudit Audit
+    {
+        get
+        {
+            if (s_audit != null) return s_audit;
+            if (Time.frameCount < s_nextLookupFrame) return null;
+
+            s_audit = Object.FindAnyObjectByType<CoverageAudit>();
+            if (s_audit == null) s_nextLookupFrame = Time.frameCount + 120;   // 2초쯤 뒤에 다시
+            return s_audit;
+        }
     }
 }
 #endif
