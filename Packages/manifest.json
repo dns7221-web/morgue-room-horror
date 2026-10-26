@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.dhs.lagmeter": "https://github.com/dns7221-web/unity-lagmeter.git#1.2.1",
+    "com.dhs.lagmeter": "https://github.com/dns7221-web/unity-lagmeter.git#1.3.0",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.ai.navigation": "2.0.12",
     "com.unity.collab-proxy": "2.12.4",
