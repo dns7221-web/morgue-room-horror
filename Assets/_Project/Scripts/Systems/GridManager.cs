@@ -501,9 +501,12 @@ public class GridManager : MonoBehaviour
             }
 
 #if UNITY_EDITOR
+            // 수정 (2026-10-26): 좌표가 아니라 칸 번호(숫자 패드)를 쓴다 — 표시판 미니맵과 같은 이유다.
+            // 좌표는 한 칸 움직일 때마다 아홉 개가 전부 바뀌어서 "어느 줄이 건너뛰었나"가 안 읽힌다.
+            // 번호는 칸에 붙어 있으니, 씬 뷰에서 번호가 통째로 옮겨 가는 모습이 그대로 보인다.
             UnityEditor.Handles.color = isCenter ? Color.green : Color.white;
             UnityEditor.Handles.Label(center + Vector3.up * 2f,
-                                      isCenter ? $"[{kv.Key.x}, {kv.Key.y}] ◀ 지금 여기" : $"{kv.Key.x}, {kv.Key.y}");
+                                      isCenter ? $"[{kv.Value.Id}] ◀ 지금 여기" : kv.Value.Id.ToString());
 #endif
         }
     }
