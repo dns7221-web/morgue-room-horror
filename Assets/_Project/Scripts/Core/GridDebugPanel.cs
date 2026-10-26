@@ -422,16 +422,20 @@ public class GridDebugPanel : MonoBehaviour
             for (int x = -r; x <= r; x++)
             {
                 var coord = new Vector2Int(c.x + x, c.y + y);
-                bool exists = grid.Cells.ContainsKey(coord);
-                string label = $"{coord.x},{coord.y}";
+                bool exists = grid.Cells.TryGetValue(coord, out var cell) && cell != null;
+                // 수정 (2026-10-26): 좌표가 아니라 칸 번호(숫자 패드)를 그린다.
+                // 좌표를 쓰면 한 칸 움직일 때마다 아홉 칸이 전부 다른 숫자가 되어
+                // "왼쪽 칸으로 갔다"도, 재활용으로 줄이 건너뛰는 것도 눈에 안 읽혔다.
+                // 번호는 칸에 붙어 있으므로 번호가 움직이는 모습으로 둘 다 보인다.
+                string label = exists ? cell.Id.ToString() : "·";
 
-                if (!exists) row += "<color=#ff5555>[ 없음 ]</color> ";
-                else if (x == 0 && y == 0) row += $"<color=#77dd77><b>[{label,5}]</b></color> ";
+                if (!exists) row += "<color=#ff5555>[ · ]</color> ";
+                else if (x == 0 && y == 0) row += $"<color=#77dd77><b>[{label,2}]</b></color> ";
                 // 추가 생성 — 방금 재활용된 줄을 색으로 띄운다. 숫자가 밀려나는 것만
                 // 봐서는 "어느 줄이 옮겨왔나"가 잘 안 읽혀서, 씬 뷰 기즈모가 2초간
                 // 빨갛게 칠하는 것과 같은 규칙을 글자에도 적용한다.
-                else if (JustRecycled(coord)) row += $"<color=#ff5555> {label,5} </color> ";
-                else row += $" {label,5}  ";
+                else if (JustRecycled(coord)) row += $"<color=#ff5555> {label,2} </color> ";
+                else row += $" {label,2}  ";
             }
             map += row + "\n";
         }

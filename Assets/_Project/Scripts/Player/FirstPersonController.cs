@@ -33,6 +33,9 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] private float moveSpeed = 2.5f;
     [Tooltip("뒤로 걸을 때 속도 배수. 1이면 앞뒤가 같다.")]
     [SerializeField, Range(0.1f, 1f)] private float backwardSpeedMultiplier = 0.4f;
+    // 추가 생성 (2026-10-26)
+    [Tooltip("Shift를 누른 채 <b>앞으로</b> 갈 때 속도 배수. 옆·뒤로는 안 걸린다.")]
+    [SerializeField, Range(1f, 3f)] private float dashMultiplier = 1.8f;
     [Tooltip("중력 가속도 (m/s²). 음수.")]
     [SerializeField] private float gravity = -9.81f;
 
@@ -54,6 +57,7 @@ public class FirstPersonController : MonoBehaviour
     // 코드로 생성하는 입력 액션 (에셋 의존 없음)
     private InputAction moveAction;
     private InputAction lookAction;
+    private InputAction dashAction;   // 추가 생성 (2026-10-26)
 
     private float pitch;              // 누적된 상하 시점 각도 (Clamp 대상)
     private float verticalVelocity;   // 중력에 의한 수직 속도
@@ -89,6 +93,11 @@ public class FirstPersonController : MonoBehaviour
 
         // 마우스의 프레임 간 이동량(delta)을 시점 입력으로 사용한다.
         lookAction = new InputAction("Look", InputActionType.Value, binding: "<Mouse>/delta");
+
+        // 추가 생성 (2026-10-26) — 대쉬. 양쪽 Shift 다 받는다.
+        dashAction = new InputAction("Dash", InputActionType.Button);
+        dashAction.AddBinding("<Keyboard>/leftShift");
+        dashAction.AddBinding("<Keyboard>/rightShift");
     }
 
     /// <summary>오브젝트 활성화 시 입력 액션을 켠다. (끄지 않으면 콜백이 계속 살아있음)</summary>
@@ -96,6 +105,7 @@ public class FirstPersonController : MonoBehaviour
     {
         moveAction.Enable();
         lookAction.Enable();
+        dashAction.Enable();
     }
 
     /// <summary>비활성화 시 입력 액션을 꺼서 리소스·이벤트 누수를 막는다.</summary>
@@ -103,6 +113,7 @@ public class FirstPersonController : MonoBehaviour
     {
         moveAction.Disable();
         lookAction.Disable();
+        dashAction.Disable();
     }
 
     /// <summary>게임 시작 시 마우스 커서를 화면 중앙에 잠그고 숨긴다(1인칭 조작감).</summary>
@@ -170,7 +181,15 @@ public class FirstPersonController : MonoBehaviour
         // 추격자는 '보이면 멈추는' 규칙이라, 앞뒤 속도가 같으면 쳐다본 채 뒤로
         // 걷는 것만으로 완전 무적이 된다. 그러면 안전구역도 쓸 이유가 없어진다.
         // 느리게 만들어 "안전하지만 오래 걸리는 길"로 바꾼다.
-        float speed = input.y < 0f ? moveSpeed * backwardSpeedMultiplier : moveSpeed;
+        // 수정 (2026-10-26) — Shift 대쉬. <b>앞으로 갈 때만</b> 걸린다.
+        //
+        // 옆·뒤까지 빨라지면 추격자를 쳐다보며 물러나는 것이 공짜가 되어, "돌아보면
+        // 멈출 수 있지만 내 발도 느려진다"는 딜레마가 사라진다. 뒷걸음 감속과 같은 이유로
+        // 앞으로만 준다 — 도망은 빨라지되 <b>등을 보여야</b> 빨라진다.
+        bool dashing = input.y > 0f && dashAction.IsPressed();
+        float speed = input.y < 0f ? moveSpeed * backwardSpeedMultiplier
+                    : dashing ? moveSpeed * dashMultiplier
+                    : moveSpeed;
 
         // 대각선(예: W+D)일 때 √2배 빨라지는 것을 막고, 속도를 곱한다.
         horizontal = Vector3.ClampMagnitude(horizontal, 1f) * speed;

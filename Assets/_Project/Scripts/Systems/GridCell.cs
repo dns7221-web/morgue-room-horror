@@ -38,6 +38,19 @@ public class GridCell : MonoBehaviour, IAnomalyHost
     /// <summary>지금 이 칸이 격자에서 차지한 좌표. GridManager가 배치·재활용 때마다 갱신한다.</summary>
     public Vector2Int Coord { get; set; }
 
+    /// <summary>
+    /// 이 칸에 평생 붙어 있는 번호 (숫자 패드 모양: 7 8 9 / 4 5 6 / 1 2 3, 가운데가 5).
+    /// 생성될 때 <see cref="GridManager"/>가 한 번 매기고 <b>다시는 바뀌지 않는다</b> —
+    /// 좌표는 재활용 때마다 변하지만 이 번호는 안 변한다.
+    ///
+    /// ── 왜 필요한가 ───────────────────────────────────────
+    /// 표시판이 좌표만 보여주면 <b>한 칸 움직일 때마다 아홉 칸의 숫자가 전부 바뀐다</b>
+    /// (플레이어가 늘 중앙이라 중심을 다시 잡기 때문). 그래서 "왼쪽 칸으로 갔다"가
+    /// 눈에 안 읽히고, 재활용으로 줄이 통째로 건너뛰는 것도 안 보인다.
+    /// 번호를 칸에 붙여 두면 <b>번호가 움직이는 모습</b>으로 둘 다 보인다.
+    /// </summary>
+    public int Id { get; set; }
+
     /// <summary>enum 방향을 격자 좌표 단위 벡터로 변환.</summary>
     public static Vector2Int ToVector(CardinalDirection dir) => dir switch
     {

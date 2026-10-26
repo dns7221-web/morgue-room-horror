@@ -79,6 +79,14 @@ public class GridManager : MonoBehaviour
     public int Radius => (gridSize - 1) / 2;
 
     /// <summary>
+    /// 생성 시점의 좌표를 숫자 패드 번호로 바꾼다 — 3x3이면 7 8 9 / 4 5 6 / 1 2 3, 가운데가 5.
+    ///
+    /// 가운데 = (칸 수 + 1) / 2, 오른쪽으로 +1, 위로 +한 변. 한 변이 5면 13이 가운데가 된다.
+    /// 번호는 <b>생성 때 한 번만</b> 매긴다 — 재활용으로 좌표가 바뀌어도 번호는 칸을 따라간다.
+    /// </summary>
+    private int NumpadId(int x, int y) => (gridSize * gridSize + 1) / 2 + x + y * gridSize;
+
+    /// <summary>
     /// 짝수를 넣으면 중앙 칸이 조각과 조각 사이 이음매에 와서 격자가 성립하지 않는다.
     /// 인스펙터에서 바꾸는 즉시 홀수로 보정하고 한 줄 알린다 — 플레이해 보고 나서야
     /// "9칸이 아니라 16칸이 깔렸다"를 깨닫는 것보다 낫다.
@@ -172,6 +180,9 @@ public class GridManager : MonoBehaviour
                 var cell = Instantiate(cellPrefab, transform);
                 cell.name = $"{cellPrefab.name}_{x}_{y}";
                 cell.Coord = coord;
+                // 추가 생성 (2026-10-26) — 숫자 패드 모양 번호(7 8 9 / 4 5 6 / 1 2 3).
+                // 가운데가 5, 오른쪽이 +1, 위가 +한 변. 한 번 매기면 평생 안 바뀐다(GridCell.Id 참고).
+                cell.Id = NumpadId(x, y);
                 cells[coord] = cell;
                 PlaceCell(cell, coord);
 
