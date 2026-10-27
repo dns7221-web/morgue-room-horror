@@ -62,6 +62,10 @@ public class GameManager : MonoBehaviour
     private int mistakes;
     // 추가 생성 (2026-10-26) — 방금 떠난 칸. 다시 꾸밀 대상을 기억해 둔다.
     private GridCell previousCell;
+    // 추가 생성 (2026-10-27) — 지금 칸에 들어오기 직전 칸과 들어온 시각.
+    // 그 칸 쪽 문은 아직 닫히는 중일 수 있어서 '그것'을 바로 심으면 문틈으로 보인다.
+    private GridCell cameFromCell;
+    private float enteredAt;
 
     /// <summary>
     /// 플레이어가 지금 안전한지 — 추격자 피신 규칙.
@@ -101,6 +105,9 @@ public class GameManager : MonoBehaviour
     public int Mistakes => mistakes;
     /// <summary>추격자 등장까지 필요한 누적 오답 수. 0이면 등장하지 않음.</summary>
     public int MistakesBeforeStalker => mistakesBeforeStalker;
+
+    /// <summary>누적 오답이 기준에 닿아 '그것'이 와야 하는 상태.</summary>
+    private bool StalkerDue => mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker;
     /// <summary>지금 선 칸에 이상현상이 있는지 (디버그·강제 판정용).</summary>
     public bool CurrentRoomHasAnomaly => CurrentAnomalyHost != null && CurrentAnomalyHost.HasAnomaly;
 
@@ -274,9 +281,12 @@ public class GameManager : MonoBehaviour
             // 더 뺏는 대신 놀라게 해서 '틀렸다'를 감각으로 남긴다.
             if (wrongAnswerFlash != null) wrongAnswerFlash.Flash();
 
-            // 기준에 닿았으면 '그것'이 다음 칸의 이상현상이 된다 (Dress에서 처리).
-            if (mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
+            // 기준에 닿았으면 사방 이웃에 '그것'을 심는다 — 어느 문으로 나가든 다음 칸에 있다.
+            if (StalkerDue)
+            {
+                MarkNeighborsForStalker();
                 Debug.Log("[GameManager] 다음 칸에는 그것이 있다");
+            }
         }
 
         // 정답/오답과 무관하게 사방 출입문의 잠금을 푼다.
@@ -325,8 +335,9 @@ public class GameManager : MonoBehaviour
     /// (OnGridCenterChanged)에만 일어난다.
     /// </summary>
     /// <param name="allowStalker">
-    /// 이 칸이 '그것'을 받을 자격이 있는지. 재활용은 한 번에 여러 칸을 옮기는데
-    /// 그중 <b>플레이어 정면 칸</b>만 true다 (OnGridCellRecycled 주석 참고).
+    /// 이 칸이 '그것'을 받을 자격이 있는지. 판정 순간의 이웃 칸
+    /// (<see cref="MarkNeighborsForStalker"/>)과 문이 닫힌 뒤의 떠난 칸
+    /// (<see cref="RedressAfterDoorCloses"/>)만 true다. 재활용되는 칸은 false.
     /// </param>
     private void Dress(IAnomalyHost room, bool allowStalker)
     {
@@ -334,11 +345,11 @@ public class GameManager : MonoBehaviour
         // 이상현상 복원·발동이 더 무거울 수 있어, 합계가 아니라 따로 봐야 원인이 갈린다.
         using var _ = s_dressMarker.Auto();
 
-        if (allowStalker && mistakesBeforeStalker > 0 && mistakes >= mistakesBeforeStalker)
+        if (allowStalker && StalkerDue)
         {
             // ⚠️ 여기서 mistakes를 0으로 돌리지 않는다 — 청산은 벌칙이 실제로 도착한
             // 순간(SetStalkerAsAnomaly)에 한다. 그래야 이 표시가 재활용으로 지워져도
-            // 다음 재활용에서 다시 심겨 벌칙이 반드시 도착한다.
+            // 들어서는 칸에서 StalkerDue로 다시 잡혀 벌칙이 반드시 도착한다.
             //
             // ⚠️ 여기서 <b>다른 칸의 표시를 지우지도 않는다</b> (겪은 버그, 2026-10-27).
             // 이 함수는 CenterChanged보다 <b>먼저</b> 불린다(GridManager.OnPlayerEnteredCell
@@ -358,7 +369,11 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 다른 칸에 남아 있는 '그것' 표시를 지운다 (지운 칸은 정상으로 복원).
+    /// 다른 칸에 남아 있는 '그것' 표시를 지운다 (지운 칸은 이상현상을 새로 추첨).
+    ///
+    /// 판정 순간 사방 이웃에 한꺼번에 심으므로(<see cref="MarkNeighborsForStalker"/>),
+    /// 들어선 한 칸을 뺀 나머지는 늘 여기서 거둔다. 정상으로 고정하지 않고 다시
+    /// 추첨하는 이유 — 고정하면 그 칸들이 '없음' 쪽으로 쏠린다.
     ///
     /// 씬의 추격자는 <b>한 마리</b>라 격자의 표시도 한 칸만 있어야 한다. 플레이어가
     /// 정면이 아니라 옆으로 돌아 걸으면 전환마다 새 정면 칸에 표시가 생기는데, 옛
@@ -377,9 +392,43 @@ public class GameManager : MonoBehaviour
         {
             var other = kv.Value;
             if (other == null || ReferenceEquals(other, keep)) continue;
-            if (other.StalkerIsAnomaly) other.SetAnomaly(false);
+            if (other.StalkerIsAnomaly) Dress(other, false);
         }
     }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-27) — 누적 오답이 기준에 닿은 <b>판정 순간</b>, 사방 이웃 칸에
+    /// '그것'을 심는다.
+    ///
+    /// 판정 순간엔 플레이어가 칸에 갇혀 있다(나가는 문이 전부 잠겨 있다). 이웃 넷이
+    /// 닫힌 문 뒤라 지금 바꿔도 안 보이고, 어느 문으로 나가든 <b>바로 다음 칸</b>에 있다.
+    /// 들어선 칸을 뺀 나머지 표시는 등장 순간 <see cref="ClearOtherStalkerMarks"/>가 거둔다.
+    ///
+    /// ⚠️ 들어온 문 쪽 칸은 조심한다. <c>Door.IsOpen</c>은 닫기 시작하는 순간 false가 되므로
+    /// 문 상태로는 "아직 닫히는 중"을 못 가린다. 들어온 지 <see cref="redressDelay"/>가
+    /// 안 지났으면 건너뛰고, 그 칸은 <see cref="RedressAfterDoorCloses"/>가 문이 닫힌 뒤에 심는다.
+    /// </summary>
+    private void MarkNeighborsForStalker()
+    {
+        var grid = GridManager.Instance;
+        if (grid == null) return;
+
+        Vector2Int center = grid.CenterCoord;
+        foreach (var dir in s_neighborDirs)
+        {
+            Vector2Int coord = center + dir;
+            if (!grid.Cells.TryGetValue(coord, out var cell) || cell == null) continue;
+            if (!grid.IsSealedToward(center, coord)) continue;   // 열린 문 너머 — 들어서는 순간 세운다
+
+            bool doorStillClosing = cell == cameFromCell && Time.time - enteredAt < redressDelay;
+            if (doorStillClosing) continue;   // RedressAfterDoorCloses가 맡는다
+
+            Dress(cell, true);
+        }
+    }
+
+    private static readonly Vector2Int[] s_neighborDirs =
+        { Vector2Int.up, Vector2Int.right, Vector2Int.down, Vector2Int.left };
 
     // ══════════════════════════════════════════════════════════════════
     // GridManager 이벤트에 접붙인 판정 배선 —
@@ -444,35 +493,22 @@ public class GameManager : MonoBehaviour
         // 꾸민다 — 재활용을 닫힌 문 뒤에 숨기는 것과 같은 규칙이다.
         if (previousCell != null && previousCell != cell)
             StartCoroutine(RedressAfterDoorCloses(previousCell));
+        cameFromCell = previousCell;
+        enteredAt = Time.time;
         previousCell = cell;
 
         // 판정 전엔 이 칸의 사방 출입문이 전부 잠긴다 — 이상현상을 관찰해서
         // O/X로 답해야 다음 칸으로 나갈 수 있다. Judge()가 판정 직후 다시 푼다.
         GridManager.Instance.SetCellExitsLocked(cell, true);
 
-        if (cell != null && cell.StalkerIsAnomaly) SetStalkerAsAnomaly(cell);
+        // 표시가 없어도 기준에 닿아 있으면 세운다 — 벌칙은 반드시 바로 다음 칸에 도착한다.
+        // 정상 흐름에선 MarkNeighborsForStalker가 미리 심어둬서 이 분기를 탈 일이 없다.
+        // 닫히던 문을 도로 열고 곧장 되돌아가는 식의 틈만 여기서 받는다 — 그때는 원래
+        // 이상현상이 눈앞에서 꺼지지만, 벌칙이 빠지는 것보다 낫다.
+        if (cell != null && (cell.StalkerIsAnomaly || StalkerDue)) SetStalkerAsAnomaly(cell);
         else DismissStalker();
     }
 
-    /// <summary>
-    /// 칸 하나가 재활용으로 자리를 옮긴 직후 — 그 칸을 새 이상현상으로 다시 꾸민다.
-    /// 재활용은 언제나 플레이어가 닿기 <b>전</b>에 일어나므로(뒤에서 조용히),
-    /// 다시 꾸며도 눈에 띄지 않는다.
-    ///
-    /// ── '그것'은 정면 칸에만 심는다 (겪은 버그) ───────────
-    /// 재활용은 한 번에 <b>한 줄(한 변만큼)</b>을 옮긴다. 그중 플레이어가 문으로
-    /// 곧장 걸어갈 수 있는 칸은 <b>정면 하나뿐</b>이고, 나머지는 대각선이라 문으로
-    /// 이어져 있지 않다(두 번 움직여야 닿는다).
-    ///
-    /// 전에는 옮겨지는 순서대로 첫 칸에 심었는데, 그 첫 칸이 하필 대각선이었다
-    /// (GridManager의 재배치 루프가 줄의 한쪽 끝에서 시작한다). 그래서 닿기 전에
-    /// 그 칸이 또 재활용되면 표시가 지워지고, <b>3번 틀렸는데 아무것도 안 나오는
-    /// 판</b>이 생겼다.
-    ///
-    /// <see cref="GridManager.RecycleRecord.to"/>가 이미 그 정면 칸 좌표다
-    /// (뒤처진 줄의 대표 좌표 + 진행 방향 × 한 변 == 새 중앙 + 진행 방향).
-    /// 새 API를 만들 필요 없이 그걸 그대로 쓴다.
-    /// </summary>
     /// <summary>
     /// 떠난 칸을 <paramref name="cell"/>, 문이 닫힌 뒤에 새 이상현상으로 바꾼다.
     ///
@@ -490,15 +526,30 @@ public class GameManager : MonoBehaviour
         if (cell == null || GridManager.Instance == null) yield break;
         if (GridManager.Instance.CenterCell == cell) yield break;   // 되돌아왔다 — 건드리지 않는다
 
-        Dress(cell, false);   // '그것'은 앞쪽 칸 몫이다(OnGridCellRecycled 참고)
+        // 이 칸은 지금 칸의 이웃이다. 판정에서 기준에 닿았는데 그때 이 칸 쪽 문이 아직
+        // 닫히는 중이었다면, MarkNeighborsForStalker가 건너뛴 이 칸에 여기서 심는다.
+        Dress(cell, true);
     }
 
+    /// <summary>
+    /// 칸 하나가 재활용으로 자리를 옮긴 직후 — 그 칸을 새 이상현상으로 다시 꾸민다.
+    /// 재활용은 언제나 플레이어가 닿기 <b>전</b>에 일어나므로(뒤에서 조용히),
+    /// 다시 꾸며도 눈에 띄지 않는다.
+    ///
+    /// ── '그것'은 여기서 심지 않는다 (겪은 버그 두 번) ──────
+    /// 처음엔 재활용되는 줄의 첫 칸에 심었는데 그게 <b>대각선</b>이라 3번 틀려도 안 나왔다.
+    /// 정면 칸(<c>LastRecycle.to</c>)으로 고쳤더니, 이번엔 표시가 늘 <b>두 칸 뒤</b>에 섰다 —
+    /// 재활용되는 칸은 플레이어가 <b>다음에 들어갈 칸이 아니기</b> 때문이다(그 칸은 이미
+    /// 꾸며져 기다리고 있다). 그 사이 방향을 틀면 표시가 또 앞으로 옮겨가, 꺾어 걸으면
+    /// 영영 안 나왔고 누적 오답은 4/3, 5/3으로 올라갔다.
+    ///
+    /// 지금은 판정 순간에 사방 이웃에 심는다(<see cref="MarkNeighborsForStalker"/>).
+    /// </summary>
     private void OnGridCellRecycled(GridCell cell)
     {
         if (cell == null) return;
 
-        bool isAheadOfPlayer = cell.Coord == GridManager.Instance.LastRecycle.to;
-        Dress(cell, isAheadOfPlayer);
+        Dress(cell, false);
     }
 
     /// <summary>
