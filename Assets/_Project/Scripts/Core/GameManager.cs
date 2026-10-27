@@ -143,6 +143,18 @@ public class GameManager : MonoBehaviour
         // 여기로 옮기면 지워져도 다음 재활용에서 다시 심긴다 — 벌칙이 반드시 도착한다.
         mistakes = 0;
 
+        // 수정 (2026-10-27) — 남은 표시를 지우는 것도 <b>여기서</b> 한다.
+        //
+        // 전에는 Dress()가 심을 때 지웠는데, Dress는 CenterChanged보다 먼저 불려서
+        // 플레이어가 방금 들어선 칸의 표시까지 지워버렸다(위 Dress 주석 참고).
+        // "청산"은 벌칙이 집행된 이 자리에서 한 번에 하는 것이 맞다 — 누적 오답을
+        // 0으로 돌리는 것과 같은 순간, 같은 이유다.
+        //
+        // 플레이어가 앞으로 걸어오는 동안 표시가 여러 칸에 심길 수 있는데(매 재활용마다
+        // 앞 칸에 하나씩), 그대로 두면 나중에 그 칸에 들어갔을 때 이미 청산된 벌칙이
+        // 한 번 더 집행된다. 씬의 추격자는 한 마리이므로 표시도 하나만 남긴다.
+        ClearOtherStalkerMarks(room);
+
         if (stalker == null)
         {
             Debug.LogWarning("[GameManager] Stalker가 연결돼 있지 않아 '있음'인데 아무것도 나타나지 않습니다.", this);
@@ -327,7 +339,14 @@ public class GameManager : MonoBehaviour
             // ⚠️ 여기서 mistakes를 0으로 돌리지 않는다 — 청산은 벌칙이 실제로 도착한
             // 순간(SetStalkerAsAnomaly)에 한다. 그래야 이 표시가 재활용으로 지워져도
             // 다음 재활용에서 다시 심겨 벌칙이 반드시 도착한다.
-            ClearOtherStalkerMarks(room);
+            //
+            // ⚠️ 여기서 <b>다른 칸의 표시를 지우지도 않는다</b> (겪은 버그, 2026-10-27).
+            // 이 함수는 CenterChanged보다 <b>먼저</b> 불린다(GridManager.OnPlayerEnteredCell
+            // 참고 — 재활용이 끝난 뒤에야 CenterChanged가 울린다). 그래서 여기서 지우면
+            // <b>플레이어가 방금 들어선 칸의 표시까지 지워져</b>, 그 칸에 도착한 순간
+            // "표시 없음"이 되어 추격자가 안 나온다. 누적 오답도 그대로 남아 다음 칸에
+            // 또 심기고, 표시가 영원히 한 칸 앞으로 도망친다. 게다가 지워진 칸은
+            // SetAnomaly(false)로 '없음'이 되어 <b>들어가는 방마다 이상현상이 사라졌다.</b>
             room.SetStalkerAsAnomaly();
             Debug.Log($"[GameManager] {room.DisplayName} 세팅 — 이상현상: 그것 (관찰해서 O로 판정할 것)");
             return;
