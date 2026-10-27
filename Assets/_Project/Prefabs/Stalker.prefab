@@ -185,7 +185,7 @@ MonoBehaviour:
   catchDistance: 1.3
   occluders:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 136
   logVisibility: 0
 --- !u!143 &3546869821062424017
 CharacterController:
