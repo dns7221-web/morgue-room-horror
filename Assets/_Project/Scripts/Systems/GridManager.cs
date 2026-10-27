@@ -194,6 +194,10 @@ public class GridManager : MonoBehaviour
 
         CenterCoord = Vector2Int.zero;
 
+        // 추가 생성 (2026-10-27) — 격자 끝의 뚫린 남·서 문간을 막는다(RefreshEdgeFillers 참고).
+        // 문이 전부 닫혀 있는 지금 만들어야 막이 문이 '닫힌 모양'으로 복제된다.
+        RefreshEdgeFillers();
+
         SpawnPlayerInCenter();
 
         Initialized?.Invoke(CenterCell);
@@ -354,6 +358,11 @@ public class GridManager : MonoBehaviour
             CellRecycled?.Invoke(cell);
         }
 
+        // 추가 생성 (2026-10-27) — 줄이 옮겨가면 '격자 끝'도 같이 바뀐다. 떠난 줄이 들고 가버린
+        // 북·동 문짝 자리를 막이 문으로 메우고, 새로 이웃이 생긴 경계의 막이 문은 치운다.
+        // 아래 4번 검사보다 먼저 해야 검사가 '막힌 뒤'의 모습을 본다.
+        RefreshEdgeFillers();
+
         // ── 4) 나타난 자리도 가려져 있는지 (추가 생성) ─────────────────────
         // 직후만 봐도 될 것 같지만 아니다 — 둘은 다른 사건이다. 2번은 "사라지는
         // 걸 봤는가", 4번은 "나타나는 걸 봤는가"를 검사한다. 하나만 두면 반쪽이다.
@@ -391,6 +400,34 @@ public class GridManager : MonoBehaviour
     {
         foreach (var d in doors)
             if (d != null) d.SetLocked(locked);
+    }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-27) — 격자 끝의 '문짝 없는 문간'을 막이 문으로 막는다.
+    ///
+    /// ── 왜 생기나 ─────────────────────────────────────────
+    /// 문짝은 북·동에만 달고, 남·서 경계는 <b>이웃 칸의 북·동 문짝</b>이 채운다(겪은 버그 ⑤ —
+    /// 경계마다 두 짝이면 두 번 열게 된다). 그런데 맨 아래 줄 너머·맨 왼쪽 줄 너머에는
+    /// 칸이 없으니 그 경계를 채울 문짝도 없다 — <b>뚫린 문간</b>이 된다.
+    ///
+    /// 가운데 칸에서 남쪽·서쪽 문을 열면 그 너머 칸의 맞은편 문간이 뚫린 채로 보이고,
+    /// 북쪽으로 걸어간 뒤 돌아보면 방금 재활용으로 치워진 줄이 있던 자리가 그대로 뚫려 있었다
+    /// (자동 플레이테스트에서 매 걸음 2곳 확인).
+    ///
+    /// ── 어떻게 막나 ───────────────────────────────────────
+    /// 이웃이 없는 남·서 경계에만 칸이 들고 있는 막이 문(<see cref="GridCell.SetEdgeFillers"/>)을
+    /// 켠다. 이웃이 있는 경계는 끈다 — 그래야 경계마다 문이 한 짝이라는 규칙이 지켜진다.
+    /// 칸 9개 × 2방향 검사라 재활용 한 번에 붙여도 부담이 없다.
+    /// </summary>
+    private void RefreshEdgeFillers()
+    {
+        foreach (var kv in cells)
+        {
+            if (kv.Value == null) continue;
+            bool southIsEdge = !cells.ContainsKey(kv.Key + South);
+            bool westIsEdge = !cells.ContainsKey(kv.Key + West);
+            kv.Value.SetEdgeFillers(southIsEdge, westIsEdge);
+        }
     }
 
     /// <summary>

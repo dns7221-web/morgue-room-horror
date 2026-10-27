@@ -104,6 +104,76 @@ public class GridCell : MonoBehaviour, IAnomalyHost
         transform.SetPositionAndRotation(position, rotation);
     }
 
+    // ── 추가 생성 (2026-10-27) — 격자 끝의 막이 문 ─────────────────────────
+    //
+    // 이 칸의 남·서 경계는 평소 이웃 칸의 북·동 문짝이 채운다. 이웃이 없을 때(격자 끝)만
+    // 쓰는 대역이라, 프리팹에 따로 박지 않고 <b>이 칸의 북·동 문짝을 처음 한 번 복제</b>해 만든다 —
+    // 문 모양을 바꿔도 막이 문이 저절로 따라오고, 프리팹을 다시 조립할 필요도 없다.
+
+    private GameObject southFiller;
+    private GameObject westFiller;
+    private bool fillersBuilt;
+
+    /// <summary>
+    /// 추가 생성 (2026-10-27) — 남·서 경계에 막이 문을 켜거나 끈다. GridManager가 배치·재활용 때마다
+    /// "그 경계에 이웃 칸이 있는가"를 보고 부른다(이웃이 없을 때만 켠다 — 경계마다 문은 한 짝).
+    /// </summary>
+    public void SetEdgeFillers(bool southIsEdge, bool westIsEdge)
+    {
+        if (!fillersBuilt)
+        {
+            fillersBuilt = true;
+            // 북 문짝을 칸 중심 기준 180도 돌리면 남쪽 경계, 동 문짝을 돌리면 서쪽 경계에 놓인다.
+            southFiller = BuildFiller(ToVector(CardinalDirection.North), "EdgeFiller_S");
+            westFiller = BuildFiller(ToVector(CardinalDirection.East), "EdgeFiller_W");
+        }
+
+        if (southFiller != null) southFiller.SetActive(southIsEdge);
+        if (westFiller != null) westFiller.SetActive(westIsEdge);
+    }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-27) — <paramref name="sourceSide"/> 쪽 문짝들을 복제해 맞은편 경계에 놓는다.
+    ///
+    /// 문짝을 칸 기준 자세(위치·회전)로 옮겨 담은 뒤, 담은 그릇을 Y축 180도로 돌린다 —
+    /// 칸이 정사각형이고 원점이 정중앙이라(PlaceCell 참고) 이 한 번의 회전이 곧 '맞은편'이다.
+    ///
+    /// 복제본은 <b>잠긴 문</b>으로 둔다. Door를 떼지 않는 이유 — 다가가면 진짜 잠긴 문처럼
+    /// '잠겨 있다'가 떠서 자연스럽고, 콜라이더·레이어(Interactable)가 그대로라 몸도 시선도 막는다.
+    /// GetDoors()에는 등록하지 않으므로 판정 잠금·문 닫기 규칙은 이 문을 모른다(모를수록 안전하다).
+    /// </summary>
+    private GameObject BuildFiller(Vector2Int sourceSide, string fillerName)
+    {
+        var sources = GetDoors(sourceSide);
+        bool any = false;
+        foreach (var d in sources) if (d != null) { any = true; break; }
+        if (!any) return null;
+
+        var root = new GameObject(fillerName);
+        root.transform.SetParent(transform, false);
+        root.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+
+        foreach (var door in sources)
+        {
+            if (door == null) continue;
+
+            // 문짝이 칸 안에서 몇 단계 아래에 있든, 칸 기준 자세로 바꿔 담는다.
+            Vector3 localPos = transform.InverseTransformPoint(door.transform.position);
+            Quaternion localRot = Quaternion.Inverse(transform.rotation) * door.transform.rotation;
+
+            var copy = Instantiate(door.gameObject, root.transform, false);
+            copy.name = door.gameObject.name + "_Filler";
+            copy.transform.localPosition = localPos;
+            copy.transform.localRotation = localRot;
+            copy.transform.localScale = door.transform.lossyScale;   // 칸 자체는 배율 1이다
+
+            var copyDoor = copy.GetComponent<Door>();
+            if (copyDoor != null) copyDoor.SetLocked(true);
+        }
+
+        return root;
+    }
+
     // ── IAnomalyHost — RoomModule과 같은 계약을 구현한다 ────────────────────
     //
     // AnomalyManager·StalkerPoint는 인스펙터에 손으로 연결하지 않고 자식에서 찾는다.
