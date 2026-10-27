@@ -269,7 +269,11 @@ public class GameManager : MonoBehaviour
 
             // ⚠ 여기서 return하면 안 된다. 아래 문 잠금 해제를 건너뛰어
             // <b>클리어한 플레이어가 칸에 갇힌다</b> — 이겼는데 못 나가는 상태.
-            if (IsCleared) OnClear();
+            //
+            // 수정 (2026-10-27) — IsCleared(>=)가 아니라 '정확히 목표에 닿은 순간'(==)에만 부른다.
+            // 데모라 클리어 뒤에도 격자가 계속 도는데, >=로 두면 그 뒤로 맞힐 때마다
+            // 클리어가 다시 울렸다(자동 플레이테스트에서 로그 반복 확인).
+            if (progress == clearGoal) OnClear();
         }
         else
         {
