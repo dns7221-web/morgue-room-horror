@@ -141,6 +141,9 @@ public class Stalker : MonoBehaviour
         controller = GetComponent<CharacterController>();
 
         SetBodyVisible(false);
+
+        // 추가 생성 (2026-10-27) — 등장 전에는 충돌 캡슐도 꺼 둔다(Vanish 주석 참고).
+        controller.enabled = false;
     }
 
     /// <summary>
@@ -174,6 +177,11 @@ public class Stalker : MonoBehaviour
     {
         MoveToSpawn(spawnPoint);
 
+        // 추가 생성 (2026-10-27) — 사라질 때 꺼 둔 충돌 캡슐을 다시 켠다. MoveToSpawn도 끝에서
+        // 켜지만, 스폰 지점이 비어 일찍 빠져나간 경우에도 Update의 Move가 꺼진 컨트롤러를
+        // 부르지 않도록 여기서 한 번 더 확실히 켠다.
+        controller.enabled = true;
+
         SetBodyVisible(true);
         active = true;
         lastReportedState = null;   // 새 등장이니 판정 로그를 처음부터 다시 남긴다
@@ -186,6 +194,11 @@ public class Stalker : MonoBehaviour
     {
         active = false;
         SetBodyVisible(false);
+
+        // 추가 생성 (2026-10-27) — 몸(렌더러)만 끄면 CharacterController는 켜진 채 남는다.
+        // 그러면 <b>보이지 않는 캡슐 기둥</b>이 사라진 자리에 그대로 서서 길을 막는다 —
+        // 잡힌 순간엔 플레이어 1.3m 앞이다(자동 플레이테스트에서 확인). 몸과 함께 충돌도 끈다.
+        controller.enabled = false;
     }
 
     /// <summary>
