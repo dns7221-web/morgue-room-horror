@@ -314,6 +314,18 @@ public class GameManager : MonoBehaviour
         if (wrongAnswerFlash != null) wrongAnswerFlash.Flash();
 
         DismissStalker();
+
+        // 추가 생성 (2026-10-27) — 잡힌 칸의 정답을 '없음'으로 돌린다.
+        //
+        // 이 칸의 이상현상은 '그것'이었는데 방금 사라졌다. 표시를 그대로 두면 정답이 '있음'인 채로
+        // 남아, <b>빈 방을 보고 O를 눌러야 맞는</b> 판정이 된다 — 관찰로는 알 수 없는 답이다
+        // (자동 플레이테스트에서 확인). 이 게임의 규칙은 "보이는 것으로 판정한다"이므로,
+        // 보이는 대로 '없음'이 정답이 되게 맞춘다.
+        //
+        // SetAnomaly(false)는 다른 변형도 정상으로 되돌리지만, '그것' 칸은 애초에 다른 변형을
+        // 꺼 둔 상태라(SetStalkerAsAnomaly) 눈앞에서 바뀌는 것은 없다.
+        var room = CurrentAnomalyHost;
+        if (room != null && room.StalkerIsAnomaly) room.SetAnomaly(false);
     }
 
     /// <summary>
