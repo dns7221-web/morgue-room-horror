@@ -259,6 +259,34 @@ public class GridManager : MonoBehaviour
         if (cells.TryGetValue(CenterCoord - dir, out var departed) && departed != null)
             foreach (var door in departed.GetDoors(dir))
                 if (door != null) door.Close();
+
+        // 추가 생성 (2026-10-27) — 지나온 경계 말고도, 격자에 열려 있는 문은 전부 닫는다.
+        //
+        // ── 왜 필요한가 (자동 플레이테스트에서 겪은 버그) ──────────
+        // 문을 닫는 곳이 위의 '지나온 경계' 한 곳뿐이었다. 그래서 문을 열어보고 <b>다른 쪽으로</b>
+        // 나가면, 쓰지 않은 그 문은 영영 열린 채 남았다 — 재활용으로 칸이 옮겨가도 그대로.
+        //  • 열린 문이 일직선으로 늘어서면 40~50m 밖 칸까지 보여 재활용 순간이 노출된다
+        //    (은폐 규칙의 전제 "방금 지나온 문만 열려 있다"가 깨진다)
+        //  • 나중에 그 칸에 다시 들어가면 판정 없이 그 문으로 걸어 나갈 수 있다
+        //    (잠금은 E 상호작용만 막고, 이미 열린 문은 그냥 통과된다)
+        // 새 칸에 들어선 순간엔 그 칸의 사방이 다시 잠기므로(GameManager.OnGridCenterChanged)
+        // 다른 문이 열려 있을 이유가 없다 — 한꺼번에 닫아 규칙을 원래대로 되돌린다.
+        CloseAllOpenDoors();
+    }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-27) — 격자의 열린 문을 전부 닫는다.
+    /// 문짝은 북·동에만 달려 있으므로(SetCellExitsLocked 참고) 칸마다 그 두 방향만 훑으면
+    /// 격자 안의 모든 경계를 한 번씩 본다. Door.Close()는 이미 닫힌 문이면 아무것도 안 한다.
+    /// </summary>
+    private void CloseAllOpenDoors()
+    {
+        foreach (var cell in cells.Values)
+        {
+            if (cell == null) continue;
+            foreach (var door in cell.GetDoors(North)) if (door != null) door.Close();
+            foreach (var door in cell.GetDoors(East)) if (door != null) door.Close();
+        }
     }
 
     /// <summary>
