@@ -46,6 +46,10 @@ internal static class CellLayerPainter
     /// <c>Floor</c>·<c>Ceiling</c>은 뺀다(가로로 보는 시선에 쓸모가 없다).
     /// <c>Props</c>·<c>Corpses</c>·<c>Lights</c>는 <b>절대 넣지 않는다</b> — 소품이 시야를 막으면
     /// 추격자가 의자 뒤에서 안 멈추는 그 사고가 재발한다.
+    ///
+    /// 이 구분은 추격자 <b>몸이 무엇에 막히는지</b>도 정한다. Stalker의 CharacterController가
+    /// <c>Default</c>를 Exclude Layers로 빼 두어서, 여기서 칠한 벽·섬에는 막히고 안 칠한
+    /// 소품은 통과한다. 소품을 칠하면 시야와 몸이 함께 어긋난다.
     /// </summary>
     private static readonly string[] StructureGroups = { "Walls", "Island" };
 
