@@ -213,6 +213,12 @@ public class Stalker : MonoBehaviour
         // 문이 열려 있으면 피신으로 치지 않으므로 그대로 들어와 잡는다.
         if (GameManager.Instance != null && GameManager.Instance.PlayerIsSheltered) return;
 
+        // 추가 생성 (2026-10-27) — O/X 판정 패널이 열려 있는 동안은 멈춘다.
+        // 패널이 열리면 조작이 잠겨 고개를 돌릴 수도 없다(JudgmentUI.Show). 그 사이에
+        // 다가오면 '보면 멈춘다'는 규칙으로 맞설 수단을 뺏긴 채 잡힌다 — 공정하지 않다.
+        // 패널을 닫으면(판정 후) 다시 규칙대로 움직인다: 안 보면 다가오고, 보면 멈춘다.
+        if (JudgmentUI.Instance != null && JudgmentUI.Instance.IsOpen) return;
+
         // 보이는 동안에는 아무것도 하지 않는다 — 위치도 회전도 그대로.
         if (seen) return;
 
