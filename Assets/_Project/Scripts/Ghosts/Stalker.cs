@@ -104,6 +104,12 @@ public class Stalker : MonoBehaviour
     /// <summary>지금 쫓아오고 있는지.</summary>
     public bool IsActive => active;
 
+    /// <summary>
+    /// 추가 생성 (2026-10-28) — 이번 프레임에 <b>실제로</b> 다가왔는지. 소리(StalkerAudio)가 읽어간다.
+    /// IsActive와 다르다 — 활성이어도 보이는 동안·판정 패널·피신 중에는 멈춰 있으므로 false다.
+    /// </summary>
+    public bool IsMoving { get; private set; }
+
     /// <summary>[디버그] 왜 안 보이는지 추적하기 위한 현재 상태 한 줄.</summary>
     public string DebugState
     {
@@ -230,6 +236,10 @@ public class Stalker : MonoBehaviour
 
     private void Update()
     {
+        // 추가 생성 (2026-10-28) — 매 프레임 '안 움직임'으로 시작해, 아래에서 실제로 Move했을 때만 켠다.
+        // 일찍 빠져나가는 갈래(보임·패널·피신·잡음)가 많아서, 갈래마다 끄는 것보다 이쪽이 빠뜨릴 일이 없다.
+        IsMoving = false;
+
         if (!active) return;
         if (!EnsureReferences()) return;
 
@@ -277,6 +287,7 @@ public class Stalker : MonoBehaviour
             // NavMesh는 의도적으로 범위 밖에 뒀다. 무엇에 막히는지는 프리팹의
             // Exclude Layers가 정한다 — 벽·문·섬에만 막히고 소품은 통과한다(클래스 주석 참고).
             controller.Move(direction * moveSpeed * Time.deltaTime);
+            IsMoving = true;   // 추가 생성 (2026-10-28) — 다가오는 소리를 켠다
 
             // 이 오브젝트는 <b>로직용 루트</b>라 회전을 통째로 덮어써도 안전하다.
             // 모델의 세우는 보정(이 시체 에셋은 z축 90°)은 자식 Model이 들고 있어야 한다 —

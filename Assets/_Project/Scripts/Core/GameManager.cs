@@ -37,6 +37,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private ScareFlash wrongAnswerFlash;
     [Tooltip("씬 단일 추격자. 칸이 몇 개 깔리든 이 한 마리만 존재한다 — 어느 칸에 세울지는 그때그때 GridCell.StalkerSpawnPoint를 넘겨 지시한다.")]
     [SerializeField] private Stalker stalker;
+    // 추가 생성 (2026-10-28)
+    [Tooltip("누적 오답이 기준에 닿은 순간(다음 칸에 '그것'이 선다) 울리는 경고음. 2D AudioSource. 비워도 동작에는 지장 없다(소리만 빠짐).")]
+    [SerializeField] private AudioSource stalkerWarningSound;
 
     [Header("Rules")]
     [Tooltip("이 횟수만큼 연속 성공하면 클리어.")]
@@ -290,6 +293,10 @@ public class GameManager : MonoBehaviour
             {
                 MarkNeighborsForStalker();
                 Debug.Log("[GameManager] 다음 칸에는 그것이 있다");
+
+                // 추가 생성 (2026-10-28) — 경고음. 오답 번쩍임과 같은 순간이지만 따로 울려서
+                // "이번 오답은 그냥 오답이 아니다 — 다음 방에 무언가 있다"를 소리로 가른다.
+                if (stalkerWarningSound != null) stalkerWarningSound.Play();
             }
         }
 
