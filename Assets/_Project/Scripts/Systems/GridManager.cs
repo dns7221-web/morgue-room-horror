@@ -58,6 +58,11 @@ public class GridManager : MonoBehaviour
     [Tooltip("은폐 검사기. 비우면 같은 오브젝트에서 자동으로 찾는다. 아예 없으면 검사만 안 돌고 격자는 그대로 돈다.")]
     [SerializeField] private CoverageAudit coverageAudit;
 
+    // 추가 생성 (2026-10-28) — 지나온 문을 '쾅' 닫을지. 등 뒤에서 튕기듯 닫히는 연출용.
+    // 끄면 예전처럼 1초 동안 천천히 닫힌다(녹화해 보고 마음에 안 들면 여기서 되돌린다).
+    [Tooltip("지나온 문을 쾅 닫는다(Door.Slam — 0.07초 + 반동). 끄면 예전처럼 1초 동안 천천히 닫힌다.")]
+    [SerializeField] private bool slamDoorBehind = true;
+
     private Grid grid;
     private readonly Dictionary<Vector2Int, GridCell> cells = new();
 
@@ -257,12 +262,14 @@ public class GridManager : MonoBehaviour
         // 경계 하나에 문이 <b>어느 칸 소속인지 정해져 있지 않다.</b> 문짝을 북·동에만
         // 달면 지나온 경계의 문은 <b>떠나온 칸</b>이 들고 있어서, 들어온 칸만 보면
         // 닫을 것을 못 찾고 문이 열린 채 남는다. 양쪽 칸에 다 걸어 둔다.
+        //
+        // 수정 (2026-10-28): 지나온 문은 Close() 대신 CloseBehind()로 닫는다 — 기본이 '쾅'(Slam)이다.
         foreach (var door in enteredCell.GetDoors(-dir))
-            if (door != null) door.Close();
+            CloseBehind(door);
 
         if (cells.TryGetValue(CenterCoord - dir, out var departed) && departed != null)
             foreach (var door in departed.GetDoors(dir))
-                if (door != null) door.Close();
+                CloseBehind(door);
 
         // 추가 생성 (2026-10-27) — 지나온 경계 말고도, 격자에 열려 있는 문은 전부 닫는다.
         //
@@ -276,6 +283,26 @@ public class GridManager : MonoBehaviour
         // 새 칸에 들어선 순간엔 그 칸의 사방이 다시 잠기므로(GameManager.OnGridCenterChanged)
         // 다른 문이 열려 있을 이유가 없다 — 한꺼번에 닫아 규칙을 원래대로 되돌린다.
         CloseAllOpenDoors();
+    }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-28) — 방금 지나온 문 하나를 닫는다. <see cref="slamDoorBehind"/>가 켜져 있으면 '쾅'.
+    ///
+    /// ── 쾅 닫아도 플레이어가 안 밀리는 이유 ───────────────────
+    /// <see cref="Door.Slam"/>은 문짝이 쓸고 지나가는 자리에 플레이어가 있으면 밀어낸다(Door 주석).
+    /// 그런데 이 함수가 불리는 건 <see cref="CellBoundaryTrigger"/>가 진입을 알린 순간이고, 그 트리거는
+    /// 플레이어가 문 평면에서 2m 깊이의 문간 볼륨을 <b>완전히 빠져나가야</b> 진입으로 친다.
+    /// 문짝 폭은 0.94m라 그 순간 플레이어는 문짝이 닿는 자리보다 1m 넘게 떨어져 있다.
+    /// 3안에서 RoomEntryTrigger가 맡던 "문간이 비었나" 확인을 이 트리거가 이미 하고 있는 셈이다.
+    ///
+    /// 쾅이든 천천히든 닫힌 결과는 같고, 빨리 닫힐수록 열린 틈으로 보일 시간만 줄어든다.
+    /// 나머지 열린 문(<see cref="CloseAllOpenDoors"/>)은 멀리 있어 그대로 천천히 닫는다.
+    /// </summary>
+    private void CloseBehind(Door door)
+    {
+        if (door == null) return;
+        if (slamDoorBehind) door.Slam();
+        else door.Close();
     }
 
     /// <summary>

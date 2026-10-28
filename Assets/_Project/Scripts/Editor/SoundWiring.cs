@@ -7,7 +7,8 @@ using UnityEngine;
 /// <summary>
 /// 소리 파일을 씬에 연결하는 도구 — <c>Tools ▸ 소리 연결 (Sound Wiring)</c>. 추가 생성 (2026-10-28).
 ///
-/// 손으로 하면 오브젝트 다섯 개를 돌며 AudioSource를 붙이고, 클립 13개를 칸마다 끌어다 놓고,
+/// 손으로 하면 오브젝트 여섯 개를 돌며 AudioSource를 붙이고, 클립 15개를 칸마다 끌어다 놓고,
+/// (수정 2026-10-28: 문 소리 2개가 늘어 다섯 개·13개 → 여섯 개·15개)
 /// 루프 · 2D/3D · 자동 재생을 하나하나 맞춰야 한다. 하나라도 빠지면 조용히 무음이 되는 종류라
 /// (예: 배경음 Play On Awake를 안 켜면 아무 오류 없이 안 들린다) 도구로 한 번에 맞춘다.
 ///
@@ -19,6 +20,8 @@ using UnityEngine;
 ///  • 깜놀 소리 → ScareFlash의 AudioSource (2D) → <c>scareSound</c> 칸에 연결 (오답 · 잡힘 공용)
 ///  • 발소리 · 숨소리 → 플레이어의 <see cref="PlayerAudio"/> (AudioSource 두 개, 2D)
 ///  • 쫓아오는 소리 → 추격자의 <see cref="StalkerAudio"/> (AudioSource 하나, 3D)
+///  • 문 소리   → 씬 루트 "DoorAudio" 오브젝트의 <see cref="DoorAudio"/> (클립 두 개만. 소리는 문 자리에서 3D로 낸다)
+///               추가 생성 (2026-10-28). 배경음처럼 칸이 아니라 씬 루트에 둔다 — 문짝 36개는 칸 프리팹 안이라 손대지 않는다.
 ///
 /// 클립은 <c>Assets/_Project/Audio</c> 아래에서 <b>파일 이름</b>으로 찾는다 — 하위 폴더로 옮겨도 그대로 찾는다.
 /// 여러 번 눌러도 결과가 같다(멱등) — 이미 붙은 부품은 새로 만들지 않고 다시 맞추기만 한다.
@@ -47,6 +50,7 @@ internal static class SoundWiring
         WireScare(report);
         WirePlayer(report);
         WireStalker(report);
+        WireDoors(report);   // 추가 생성 (2026-10-28)
 
         Undo.CollapseUndoOperations(undoGroup);
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
@@ -206,6 +210,38 @@ internal static class SoundWiring
         source.volume = 0f;                             // 실제 볼륨은 StalkerAudio가 움직임에 따라 올린다
 
         report.Add($"쫓아오는 소리 → {stalker.name} (3D, 20m까지)");
+    }
+
+    // ── 문: 여는 소리 · 닫히는 소리 ─────────────────────────
+
+    // 추가 생성 (2026-10-28) — 씬 루트의 "DoorAudio"를 찾고, 없으면 만든다(배경음과 같은 방식).
+    // AudioSource는 붙이지 않는다 — DoorAudio가 소리를 낼 때마다 문 자리에 임시 소리를 만든다(DoorAudio 주석).
+    private static void WireDoors(List<string> report)
+    {
+        var openClip = FindClip("SFX_Door_Open", report);
+        var shutClip = FindClip("SFX_Door_Shut", report);
+        if (openClip == null && shutClip == null) return;
+
+        GameObject go = null;
+        foreach (var root in EditorSceneManager.GetActiveScene().GetRootGameObjects())
+            if (root.name == "DoorAudio") go = root;
+        if (go == null)
+        {
+            go = new GameObject("DoorAudio");
+            Undo.RegisterCreatedObjectUndo(go, "소리 연결");
+        }
+
+        var audio = go.GetComponent<DoorAudio>();
+        if (audio == null) audio = Undo.AddComponent<DoorAudio>(go);
+
+        // 못 찾은 쪽은 비워 둔다 — 그 소리만 빠지고 나머지는 그대로 돈다
+        var so = new SerializedObject(audio);
+        so.FindProperty("openSound").objectReferenceValue = openClip;
+        so.FindProperty("shutSound").objectReferenceValue = shutClip;
+        so.ApplyModifiedProperties();
+
+        report.Add($"문 소리 → 씬 루트 'DoorAudio' (여는 소리 {(openClip != null ? "있음" : "없음")}, " +
+                   $"닫히는 소리 {(shutClip != null ? "있음" : "없음")})");
     }
 
     // ── 도우미 ──────────────────────────────────────────────

@@ -50,6 +50,15 @@ public class Door : MonoBehaviour, IInteractable
     /// <summary>문이 현재 열려 있는지.</summary>
     public bool IsOpen => isOpen;
 
+    // 추가 생성 (2026-10-28) — 문 소리 신호.
+    // 문은 소리를 직접 내지 않고 "열렸다 / 다 닫혀 문틀에 닿았다"는 신호만 낸다. 씬에 하나 있는
+    // DoorAudio가 받아서 그 문 자리에서 소리를 낸다. 문짝은 칸 프리팹 안에 36개(9칸 × 2면 × 2짝)라
+    // 문마다 AudioSource를 달면 프리팹을 고쳐야 하고, 볼륨 하나 바꾸는 데도 36군데를 손대야 한다.
+    /// <summary>문이 열리기 시작한 순간.</summary>
+    public static event System.Action<Door> Opened;
+    /// <summary>닫힘 동작이 끝까지 가서 문틀에 닿은 순간. 도중에 다시 열리면 오지 않는다.</summary>
+    public static event System.Action<Door> Shut;
+
     private bool isOpen;
     private Quaternion closedRotation;
     private Coroutine motion;
@@ -74,6 +83,7 @@ public class Door : MonoBehaviour, IInteractable
         if (isOpen) return;
         isOpen = true;
         StartMotion(openAngle);
+        Opened?.Invoke(this);   // 추가 생성 (2026-10-28) — '끼익'은 열리기 시작할 때 낸다
     }
 
     /// <summary>문을 닫는다. (코드에서도 호출 — 잠금 무시)</summary>
@@ -81,7 +91,11 @@ public class Door : MonoBehaviour, IInteractable
     {
         if (!isOpen) return;
         isOpen = false;
-        StartMotion(0f);
+
+        // 수정 (2026-10-28): StartMotion(0f) 대신 닫기 전용 코루틴을 쓴다 — 다 닫힌 순간에 '쿵' 신호를 내려고.
+        // 움직임(1초 보간)은 전과 똑같다.
+        if (motion != null) StopCoroutine(motion);
+        motion = StartCoroutine(CloseRoutine());
     }
 
     /// <summary>
@@ -115,10 +129,23 @@ public class Door : MonoBehaviour, IInteractable
         transform.localRotation = TargetOf(open ? openAngle : 0f);
     }
 
+    /// <summary>
+    /// 추가 생성 (2026-10-28) — 천천히 닫고(openDuration), 문틀에 닿은 순간 <see cref="Shut"/>을 알린다.
+    ///
+    /// 도중에 다시 열리면(Interact 토글) Open → StartMotion이 이 코루틴을 멈추므로 신호가 안 나간다 —
+    /// 문틀에 닿지 않은 문에서 '쿵'이 나면 안 되기 때문이다.
+    /// </summary>
+    private IEnumerator CloseRoutine()
+    {
+        yield return Rotate(TargetOf(0f), openDuration);
+        Shut?.Invoke(this);
+    }
+
     private IEnumerator SlamRoutine()
     {
         // ① 쾅 — 현재 각도에서 닫힘까지 최단 시간에 내리꽂는다.
         yield return Rotate(TargetOf(0f), slamDuration);
+        Shut?.Invoke(this);   // 추가 생성 (2026-10-28) — 소리는 문틀에 부딪힌 이 순간이다(반동 전)
 
         if (slamReboundAngle <= 0f || slamReboundDuration <= 0f) yield break;
 
