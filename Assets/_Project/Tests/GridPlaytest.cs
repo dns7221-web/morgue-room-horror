@@ -169,6 +169,12 @@ public class GridPlaytest
         var grid = GridManager.Instance;
         var route = new[] { N, E, S, W, N, N, E, S, W, N };
 
+        // 추가 생성 (2026-10-28) — 지나온 문이 문틀에 닿을 때 '쿵' 신호(Door.Shut)가 나는지 센다.
+        // 문 소리는 DoorAudio가 이 신호를 받아서 내므로, 신호가 안 나면 소리도 안 난다.
+        int shutSignals = 0;
+        System.Action<Door> onShut = _ => shutSignals++;
+        Door.Shut += onShut;
+
         foreach (var dir in route)
         {
             Vector2Int before = grid.CenterCoord;
@@ -188,6 +194,13 @@ public class GridPlaytest
 
             CheckGridInvariants($"{Name(dir)} 이동 후");
         }
+
+        // 추가 생성 (2026-10-28) — 마지막 문이 닫히는 순간까지 기다렸다가 센다(쾅이면 0.2초, 천천히면 1초)
+        yield return new WaitForSeconds(1.2f);
+        Door.Shut -= onShut;
+        PT($"'쿵' 신호 {shutSignals}회 — 이동 {route.Length}번(이중문은 짝마다 한 번씩 온다)");
+        if (shutSignals == 0)
+            findings.Add("지나온 문이 닫혔는데 '쿵' 신호(Door.Shut)가 한 번도 안 났다 — 문 소리가 안 난다");
 
         if (audit != null)
         {
@@ -331,6 +344,16 @@ public class GridPlaytest
         if (gm.Mistakes != 0) findings.Add($"추격자가 도착했는데 누적 오답이 {gm.Mistakes}로 남았다");
 
         // ① 쳐다보면 멈춘다
+        // 수정 (2026-10-28): 먼저 '그것'이 화면에 실제로 보이는 자리로 옮긴다. 등장 자리는 섬 너머 구석이라
+        // 들어선 문간에서는 섬에 가려 안 보일 수 있다 — 거기서는 다가오는 게 맞는 동작이다(안 보면 다가온다).
+        // 예전에 문간에서 그대로 통과했던 건 시야 판정 표본점이 몸 10m 앞 허공에 있었기 때문이다(L 참고).
+        if (TryFindVisibleSpot(stalker, out Vector3 vantage, out int vantagePixels))
+        {
+            playerRoot.position = vantage;
+            Physics.SyncTransforms();
+            PT($"'그것'이 화면에 보이는 자리로 옮김 — {vantage}, 화면에 {vantagePixels}화소");
+        }
+        else findings.Add("칸 어디에서도 '그것'이 화면에 뚜렷이 보이는 자리를 못 찾았다");
         Face(stalker.transform.position);
         yield return null;
         Snap("E-그것-등장-쳐다봄");
@@ -674,6 +697,316 @@ public class GridPlaytest
             findings.Add("뚫린 경계를 피신 판정 AreBoundaryDoorsClosed는 '닫힘'으로 본다");
 
         Report("K 문짝 없는 문간");
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 12. 보는 동안 다가오는가 — '보면 멈춘다' 판정이 실제 화면과 맞는가
+    // ──────────────────────────────────────────────────────────────
+
+    private const int VisiblePixels = 15;   // 비교용 화면(가로 320)에 이만큼 넘게 비치면 '보인다'로 친다
+
+    /// <summary>
+    /// 추가 생성 (2026-10-28) — 사용자 제보 "쳐다보고 있는데 가끔 그냥 다가온다"를 숫자로 확인한다.
+    ///
+    /// 추격자가 멈출지 정하는 판정(<c>Stalker.IsSeenByPlayer</c>)과 <b>실제 화면</b>을 칸 곳곳에서 비교한다.
+    /// 실제 화면은 렌더링으로 잰다 — 추격자만 무광 자홍색으로 바꿔 찍고 그 색 화소를 센다. 판정은
+    /// 선(Linecast)을 긋지만 눈은 화면을 보므로, 유리창처럼 선은 막고 눈에는 비치는 것이 그대로 드러난다.
+    ///
+    ///  • 화면에 보이는데 '안 보임' 판정 → 그 자리에서 쳐다보는 동안 다가온다 (제보된 버그)
+    ///  • 화면에 없는데 '보임' 판정      → 가려져 있는데 멈춘다 (덜 무섭지만 무해 — 세기만 한다)
+    ///
+    /// 비교하는 동안 추격자의 Update는 멈춰 둔다(움직이거나 잡으면 비교가 안 된다). 판정 함수는 직접 부른다.
+    /// 추격자는 실제 등장 자리 + 방 안 여덟 곳에 세우고, 플레이어는 칸 바닥을 1m 눈금으로 훑는다.
+    /// 문을 다 닫은 판과 다 연 판(열린 문짝 유리창이 시선에 끼는 경우)을 따로 잰다.
+    /// </summary>
+    [UnityTest]
+    [Timeout(600000)]
+    public IEnumerator L_보는_동안_다가오는가()
+    {
+        LogAssert.ignoreFailingMessages = true;   // 에러 로그가 나와도 끝까지 재본 뒤 한꺼번에 보고한다
+        yield return MakeMistakes(3, N);
+        yield return Cross(N);
+
+        var gm = GameManager.Instance;
+        var grid = GridManager.Instance;
+        var stalker = gm.Stalker;
+        var flatShader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (!stalker.IsActive || flatShader == null)
+        {
+            findings.Add($"비교를 시작하지 못했다 — 추격자 활성 {stalker.IsActive}, 무광 셰이더 {(flatShader != null ? "있음" : "없음")}");
+            Report("L 보는 동안 다가오는가");
+            yield break;
+        }
+
+        const System.Reflection.BindingFlags Private =
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var isSeen = typeof(Stalker).GetMethod("IsSeenByPlayer", Private);
+        var ensureRefs = typeof(Stalker).GetMethod("EnsureReferences", Private);
+        var onScreenField = typeof(Stalker).GetField("lastOnScreen", Private);
+        var blockerField = typeof(Stalker).GetField("lastBlocker", Private);
+
+        stalker.enabled = false;            // 재는 동안 움직이거나 잡지 않게
+        ensureRefs.Invoke(stalker, null);   // 판정이 쓰는 카메라·플레이어 참조를 채워 둔다
+
+        var cam = Camera.main;
+        var body = stalker.GetComponentsInChildren<Renderer>(true);
+        var stalkerBody = stalker.GetComponent<CharacterController>();
+        // 표본점이 몸 위에 있는지 먼저 본다 — 판정은 표본점까지 선을 긋는 것이라, 몸에서 떨어져 있으면
+        // 몸이 아니라 엉뚱한 허공이 보이는지를 재게 된다(2026-10-28 실제 원인: 표본점이 몸 10.37m 앞에 있었다).
+        var points = (Transform[])typeof(Stalker).GetField("samplePoints", Private).GetValue(stalker);
+        Bounds bodyBounds = body[0].bounds;
+        foreach (var r in body) bodyBounds.Encapsulate(r.bounds);
+        Vector3 root = stalker.transform.position;
+        var outside = new List<string>();
+        var heights = new List<string>();
+        foreach (var t in points)
+        {
+            if (t == null) continue;
+            float off = Mathf.Sqrt(bodyBounds.SqrDistance(t.position));
+            heights.Add($"{t.name} {t.position.y - root.y:F2}m");
+            if (off > 0.3f) outside.Add($"{t.name} {off:F1}m");
+        }
+        Vector3 centerLocal = stalker.transform.InverseTransformPoint(bodyBounds.center);
+        PT($"추격자 몸 경계 — 발 기준 높이 {bodyBounds.min.y - root.y:F2}~{bodyBounds.max.y - root.y:F2}m, " +
+           $"폭 {bodyBounds.size.x:F2}×{bodyBounds.size.z:F2}m, 중심(추격자 기준) {centerLocal} · " +
+           $"표본점 높이 [{string.Join(", ", heights)}] · 몸 밖 표본점: {(outside.Count == 0 ? "없음" : string.Join(", ", outside))}");
+        if (outside.Count > 0)
+            findings.Add($"시야 판정 표본점이 몸 밖에 있다 ({string.Join(", ", outside)}) — 몸이 아닌 허공까지 선을 긋는다");
+
+        var magenta = new Material(flatShader);
+        magenta.SetColor("_BaseColor", Color.magenta);
+        magenta.SetColor("_Color", Color.magenta);
+
+        // 비교용 화면은 카메라 화면비 그대로 — 다르면 화면 가장자리에서 '화면 밖' 판정과 어긋난다
+        int shotW = 320, shotH = Mathf.Max(1, Mathf.RoundToInt(320 / cam.aspect));
+        var shot = new Texture2D(shotW, shotH, TextureFormat.RGB24, false);
+
+        var cell = grid.CenterCell;
+        Vector3 playerStart = playerRoot.position;
+        Quaternion playerStartRot = playerRoot.rotation;
+        Vector3 stalkerStart = stalker.transform.position;
+
+        // 바탕에 원래 자홍색이 있는지 — 있으면 화소 세기가 틀린다
+        foreach (var r in body) r.enabled = false;
+        int baseline = CountFlatPixels(cam, body, magenta, shot);
+        foreach (var r in body) r.enabled = true;
+
+        // 추격자를 세워 볼 자리 — 실제 등장 자리 + 방 안 여덟 곳(칸 기준 좌표)
+        var stalkerSpots = new List<Vector3> { stalkerStart };
+        foreach (var o in new[] { new Vector2(6, 6), new Vector2(-6, 6), new Vector2(6, -6), new Vector2(-6, -6),
+                                  new Vector2(0, 6), new Vector2(0, -6), new Vector2(6, 0), new Vector2(-6, 0) })
+        {
+            Vector3 p = cell.transform.TransformPoint(new Vector3(o.x, 0f, o.y));
+            p.y = stalkerStart.y;
+            stalkerSpots.Add(p);
+        }
+
+        int samples = 0, visibleCount = 0, frozenHidden = 0, snaps = 0;
+        var missed = new List<(int pixels, string where, string why)>();
+        var reasons = new Dictionary<string, int>();
+
+        for (int pass = 0; pass < 2; pass++)
+        {
+            if (pass == 1)
+            {
+                // 두 번째 판: 이 칸의 문을 전부 연다 — 열린 문짝(유리창 달림)이 시선에 끼는 경우
+                foreach (var dir in new[] { N, E, S, W })
+                    foreach (var d in DoorsBetween(grid.CenterCoord, dir))
+                        if (d != null) d.Open();
+                yield return new WaitForSeconds(DoorWait);
+            }
+            string doors = pass == 0 ? "문 닫힘" : "문 열림";
+
+            for (int s = 0; s < stalkerSpots.Count; s++)
+            {
+                stalker.transform.position = stalkerSpots[s];
+                Physics.SyncTransforms();
+                if (s > 0 && BodyBlocked(stalkerSpots[s], stalker.transform.rotation, stalkerBody, stalkerBody)) continue;   // 섬·벽 속이면 설 수 없는 자리
+
+                for (int x = -9; x <= 9; x++)
+                for (int z = -9; z <= 9; z++)
+                {
+                    if (NearDoorwayTrigger(x, z)) continue;
+                    Vector3 p = cell.transform.TransformPoint(new Vector3(x, 0f, z));
+                    p.y = playerStart.y;
+
+                    Vector3 gap = stalkerSpots[s] - p;
+                    gap.y = 0f;
+                    if (gap.magnitude < 2f) continue;   // 잡히는 거리 언저리는 비교할 필요가 없다
+                    // 캡슐 중심이 발밑이 아니라 (0.5, 1, -0.6)에 있어서, 바라보는 방향으로 돌린 자세로 재야 한다
+                    if (BodyBlocked(p, Quaternion.LookRotation(gap, Vector3.up), playerBody, stalkerBody)) continue;   // 벽·섬·소품 속이면 설 수 없는 자리
+
+                    playerRoot.position = p;
+                    Physics.SyncTransforms();
+                    Face(stalkerSpots[s]);
+
+                    bool judged = (bool)isSeen.Invoke(stalker, null);
+                    int pixels = CountFlatPixels(cam, body, magenta, shot);
+                    samples++;
+
+                    if (pixels >= VisiblePixels)
+                    {
+                        visibleCount++;
+                        if (!judged)
+                        {
+                            bool onScreen = (bool)onScreenField.GetValue(stalker);
+                            string why = onScreen ? $"가림 — {blockerField.GetValue(stalker) ?? "?"}" : "화면 밖 판정";
+                            reasons[why] = reasons.TryGetValue(why, out int n) ? n + 1 : 1;
+                            missed.Add((pixels, $"{doors} · 그것 자리 {s} · 플레이어 칸 좌표 ({x}, {z}) · 거리 {gap.magnitude:F1}m", why));
+                            if (pixels >= 200 && snaps < 3) { Snap($"L-보이는데-다가옴-{++snaps}"); }
+                        }
+                    }
+                    else if (judged && pixels == 0) frozenHidden++;
+
+                    if (samples % 25 == 0) yield return null;   // 한 프레임에 너무 오래 머물지 않게
+                }
+            }
+        }
+
+        playerRoot.SetPositionAndRotation(playerStart, playerStartRot);
+        stalker.transform.position = stalkerStart;
+        Physics.SyncTransforms();
+        stalker.enabled = true;
+        UnityEngine.Object.Destroy(magenta);
+        UnityEngine.Object.Destroy(shot);
+
+        int big = 0;
+        foreach (var m in missed) if (m.pixels >= 200) big++;
+        PT($"시야 비교 — 표본 {samples}곳(바탕 자홍 화소 {baseline}), 실제로 화면에 보인 곳 {visibleCount}, " +
+           $"그중 '안 보임' 판정 = 쳐다보는데 다가오는 곳 {missed.Count}(뚜렷이 보이는 200화소 이상 {big}), " +
+           $"화면에 없는데 '보임' 판정 {frozenHidden}");
+        foreach (var kv in reasons) PT($"  · {kv.Key}: {kv.Value}곳");
+        missed.Sort((a, b) => b.pixels.CompareTo(a.pixels));
+        for (int i = 0; i < Mathf.Min(10, missed.Count); i++)
+            PT($"  예 {i + 1}: 화소 {missed[i].pixels} · {missed[i].where} · {missed[i].why}");
+
+        if (missed.Count > 0)
+            findings.Add($"화면에 보이는데 '안 보임'으로 판정된 자리 {missed.Count}곳(뚜렷이 보이는 곳 {big}) — " +
+                         "그 자리에서 쳐다보는 동안 다가온다");
+
+        Report("L 보는 동안 다가오는가");
+    }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-28) — 지금 칸 바닥(1m 눈금)에서 '그것'이 화면에 뚜렷이(200화소 넘게) 보이는 자리 중
+    /// 플레이어와 가장 가까운 곳을 찾는다. 판정 함수가 아니라 실제 화면(CountFlatPixels)으로 고른다 —
+    /// 판정으로 고르면 판정이 틀렸을 때 그 틀림을 그대로 물려받는다. 찾는 동안 프레임은 넘기지 않는다.
+    /// </summary>
+    private bool TryFindVisibleSpot(Stalker stalker, out Vector3 spot, out int spotPixels)
+    {
+        spot = playerRoot.position;
+        spotPixels = 0;
+        var flatShader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (flatShader == null) return false;
+
+        var cam = Camera.main;
+        var body = stalker.GetComponentsInChildren<Renderer>(true);
+        var stalkerBody = stalker.GetComponent<CharacterController>();
+        var magenta = new Material(flatShader);
+        magenta.SetColor("_BaseColor", Color.magenta);
+        magenta.SetColor("_Color", Color.magenta);
+        var shot = new Texture2D(320, Mathf.Max(1, Mathf.RoundToInt(320 / cam.aspect)), TextureFormat.RGB24, false);
+
+        var cell = GridManager.Instance.CenterCell;
+        Vector3 start = playerRoot.position;
+        Quaternion startRot = playerRoot.rotation;
+        Vector3 target = stalker.transform.position;
+        float best = float.MaxValue;
+        bool found = false;
+
+        for (int x = -9; x <= 9; x++)
+        for (int z = -9; z <= 9; z++)
+        {
+            if (NearDoorwayTrigger(x, z)) continue;
+            Vector3 p = cell.transform.TransformPoint(new Vector3(x, 0f, z));
+            p.y = start.y;
+            Vector3 gap = target - p;
+            gap.y = 0f;
+            if (gap.magnitude < 3f) continue;   // 너무 가까우면 쳐다보기 전에 잡힌다
+            if (BodyBlocked(p, Quaternion.LookRotation(gap, Vector3.up), playerBody, stalkerBody)) continue;
+
+            float travel = Vector3.Distance(p, start);
+            if (travel >= best) continue;   // 이미 찾은 자리보다 멀면 찍어 볼 필요도 없다
+
+            playerRoot.position = p;
+            Physics.SyncTransforms();
+            Face(target);
+            int pixels = CountFlatPixels(cam, body, magenta, shot);
+            if (pixels < 200) continue;
+
+            best = travel;
+            spot = p;
+            spotPixels = pixels;
+            found = true;
+        }
+
+        playerRoot.SetPositionAndRotation(start, startRot);
+        Physics.SyncTransforms();
+        UnityEngine.Object.Destroy(magenta);
+        UnityEngine.Object.Destroy(shot);
+        return found;
+    }
+
+    /// <summary>
+    /// 문간 진입 트리거(문 평면에서 안쪽 2m · 폭 4m) 근처인지 — 칸 기준 정수 좌표.
+    /// 순간이동으로 그 안에 들어갔다 나오면 칸 진입으로 착각하므로 아예 피한다.
+    /// </summary>
+    private static bool NearDoorwayTrigger(int x, int z) =>
+        (Mathf.Abs(x) <= 3 && Mathf.Abs(z) >= 7) || (Mathf.Abs(z) <= 3 && Mathf.Abs(x) >= 7);
+
+    /// <summary>
+    /// 그 자리에 몸(캡슐)이 설 수 있는지 — 벽·섬·문·소품 속이면 못 선다. 플레이어 자신과
+    /// 재는 중인 추격자 몸(<paramref name="ignore"/>)은 빼고 본다.
+    /// </summary>
+    private static bool BodyBlocked(Vector3 position, Quaternion rotation, CharacterController shape, CharacterController ignore)
+    {
+        Vector3 c = position + rotation * shape.center;   // 캡슐 중심은 몸 기준 좌표라 자세(회전)를 따라 돈다
+        float half = Mathf.Max(shape.height * 0.5f - shape.radius, 0f);
+        Vector3 top = c + Vector3.up * half;
+        Vector3 bottom = c - Vector3.up * half + Vector3.up * 0.1f;   // 바닥에 닿는 건 막힘이 아니다
+        int mask = ~(1 << LayerMask.NameToLayer("Player"));
+
+        foreach (var hit in Physics.OverlapCapsule(bottom, top, shape.radius, mask, QueryTriggerInteraction.Ignore))
+            if (hit != ignore && hit != shape) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 추격자만 무광 자홍색으로 바꿔 지금 카메라로 찍고, 그 색 화소를 센다 — '실제로 화면에 비쳤나'의 기준.
+    /// 조명과 상관없이 몸이 화면에 남긴 자리만 센다(그림자는 자홍색이 아니다). 유리 너머로 비친 것도 센다.
+    /// </summary>
+    private static int CountFlatPixels(Camera cam, Renderer[] body, Material flat, Texture2D shot)
+    {
+        var saved = new Material[body.Length][];
+        for (int i = 0; i < body.Length; i++)
+        {
+            saved[i] = body[i].sharedMaterials;
+            var swap = new Material[saved[i].Length];
+            for (int k = 0; k < swap.Length; k++) swap[k] = flat;
+            body[i].sharedMaterials = swap;
+        }
+
+        var rt = RenderTexture.GetTemporary(shot.width, shot.height, 24);
+        var previousTarget = cam.targetTexture;
+        var previousActive = RenderTexture.active;
+        cam.targetTexture = rt;
+        cam.Render();
+        cam.targetTexture = previousTarget;
+        RenderTexture.active = rt;
+        shot.ReadPixels(new Rect(0, 0, shot.width, shot.height), 0, 0);
+        shot.Apply(false);
+        RenderTexture.active = previousActive;
+        RenderTexture.ReleaseTemporary(rt);
+
+        for (int i = 0; i < body.Length; i++) body[i].sharedMaterials = saved[i];
+
+        // 자홍 = 빨강·파랑은 높고 초록은 낮다. 후처리·유리에 조금 물들어도 잡히게 넉넉히 본다.
+        // 수천 번 부르므로 GetPixels32(매번 새 배열) 대신 텍스처 원본 바이트(RGB 3바이트씩)를 그대로 읽는다.
+        var raw = shot.GetRawTextureData<byte>();
+        int n = 0;
+        for (int i = 0; i + 2 < raw.Length; i += 3)
+            if (raw[i] - raw[i + 1] > 50 && raw[i + 2] - raw[i + 1] > 50) n++;
+        return n;
     }
 
     /// <summary>

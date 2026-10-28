@@ -89,6 +89,7 @@ public class Stalker : MonoBehaviour
     private CharacterController controller;
     private Camera eye;
     private Transform player;
+    private CharacterController playerBody;   // 추가 생성 (2026-10-28) — 시선 출발점을 몸 안에 잡으려고 (SightOrigin)
     private bool active;
 
     // 추가 생성 — 렉 미터용 계측 구간. 이름을 LagMeterRows가 그대로 등록한다.
@@ -336,7 +337,9 @@ public class Stalker : MonoBehaviour
         // ⚠ occluders 마스크에서 <b>Player와 추격자 자신은 빼둬야 한다.</b> 시선의
         // 출발점인 카메라가 플레이어 몸 안에 있어, 마스크에 남겨두면 자기 몸이
         // 첫 히트로 잡혀 <b>정면으로 쳐다봐도 영영 '가려짐'</b>이 된다.
-        Vector3 from = eye.transform.position;
+        //
+        // 수정 (2026-10-28): 출발점을 카메라가 아니라 몸 안의 눈높이로 잡는다(SightOrigin 주석).
+        Vector3 from = SightOrigin();
         foreach (var p in samplePoints)
         {
             if (p == null) continue;
@@ -385,7 +388,30 @@ public class Stalker : MonoBehaviour
             var teleporter = FindAnyObjectByType<PlayerTeleporter>();
             if (teleporter != null) player = teleporter.transform;
         }
+        // 추가 생성 (2026-10-28) — 몸(캡슐)은 없어도 된다. 없으면 SightOrigin이 예전처럼 카메라 위치를 쓴다.
+        if (playerBody == null && player != null) playerBody = player.GetComponent<CharacterController>();
         return eye != null && player != null;
+    }
+
+    /// <summary>
+    /// 추가 생성 (2026-10-28) — 시선을 어디서부터 긋나. 플레이어 몸(캡슐)의 세로축 위, 카메라 높이의 점.
+    ///
+    /// ── 왜 카메라 위치를 그대로 안 쓰나 ──────────────────────
+    /// 이 플레이어의 카메라는 캡슐 중심보다 0.63m 뒤, <b>캡슐 밖</b>에 달려 있다(팔이 화면에 들어오게 둔 구도).
+    /// 벽에 등을 대면 캡슐은 벽에 막히지만 카메라만 벽 너머로 나간다. 벽은 한쪽 면만 그려지는 얇은 판이라
+    /// 화면에는 방이 그대로 보이는데, 카메라에서 선을 그으면 그 벽에 먼저 걸려 '안 보임'이 된다 —
+    /// 쳐다보며 뒷걸음질하다 벽에 닿는 바로 그 순간 다가왔다(자동 플레이테스트 L에서 확인).
+    ///
+    /// 캡슐은 벽을 못 뚫으므로 캡슐 축 위의 점은 언제나 방 안이다. 높이는 카메라를 따르고, 위치만
+    /// 0.63m 앞으로 당긴 것이라 무엇이 보이는지는 거의 같다. 화면 구도(카메라)는 건드리지 않았다.
+    /// </summary>
+    private Vector3 SightOrigin()
+    {
+        Vector3 eyePosition = eye.transform.position;
+        if (playerBody == null) return eyePosition;
+
+        Vector3 axis = player.TransformPoint(playerBody.center);
+        return new Vector3(axis.x, eyePosition.y, axis.z);
     }
 
     private void OnDrawGizmosSelected()
