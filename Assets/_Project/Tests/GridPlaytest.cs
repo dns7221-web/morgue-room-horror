@@ -472,6 +472,9 @@ public class GridPlaytest
     // ──────────────────────────────────────────────────────────────
 
     [UnityTest]
+    // 추가 생성 (2026-10-28) — 에디터 Test Runner는 실제 속도로 돌아 기본 제한 3분을 넘긴다(10/27 실패 원인).
+    // 제한에 걸리면 걷던 도중에 걸음이 끊겨, 걸음 실패가 아닌데도 '이동 실패'처럼 보이는 기록이 남는다. 10분까지 기다린다.
+    [Timeout(600000)]
     public IEnumerator H_쓰지_않고_열어둔_문()
     {
         LogAssert.ignoreFailingMessages = true;   // 에러 로그가 나와도 끝까지 걸어본 뒤 한꺼번에 보고한다
@@ -550,6 +553,8 @@ public class GridPlaytest
     // ──────────────────────────────────────────────────────────────
 
     [UnityTest]
+    // 추가 생성 (2026-10-28) — H와 같은 이유. 14걸음을 실제 속도로 걸으면 3분을 넘긴다.
+    [Timeout(600000)]
     public IEnumerator J_무작위_산책()
     {
         LogAssert.ignoreFailingMessages = true;   // 에러 로그가 나와도 끝까지 걸어본 뒤 한꺼번에 보고한다
