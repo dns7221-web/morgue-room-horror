@@ -22,6 +22,11 @@ using UnityEngine;
 ///
 /// 배치: Screen Space - Overlay Canvas 아래, 화면을 꽉 채우는 Image +
 ///       CanvasGroup을 가진 오브젝트에 붙인다. (ScreenFader와 같은 방식)
+///
+/// ── 소리 (2026-10-28 추가) ───────────────────────────
+/// 그림만으로는 화면을 안 보고 있던 순간(고개를 돌린 사이)엔 놀람이 통째로 빠진다.
+/// 소리를 <b>이 부품 안에</b> 같이 둔다 — 번쩍임은 오답·잡힘 두 곳에서 불리므로, 소리를
+/// 부르는 쪽마다 따로 달면 한쪽을 빠뜨리기 쉽다. "깜놀 = 그림 + 소리"를 한 곳에서 낸다.
 /// </summary>
 [RequireComponent(typeof(CanvasGroup))]
 public class ScareFlash : MonoBehaviour
@@ -33,6 +38,11 @@ public class ScareFlash : MonoBehaviour
     [SerializeField] private float holdDuration = 0.12f;
     [Tooltip("사라지는 시간(초). 잔상을 남기려면 등장보다 살짝 길게.")]
     [SerializeField] private float fadeOutDuration = 0.18f;
+
+    // 추가 생성 (2026-10-28)
+    [Header("Sound")]
+    [Tooltip("번쩍일 때 같이 울릴 소리. 2D AudioSource에 클립을 넣어 연결한다. 비워도 그림만 번쩍인다.")]
+    [SerializeField] private AudioSource scareSound;
 
     private CanvasGroup group;
     private Coroutine running;
@@ -49,12 +59,19 @@ public class ScareFlash : MonoBehaviour
     }
 
     /// <summary>한 번 번쩍인다. 연달아 부르면 앞의 것을 끊고 다시 시작한다.</summary>
-    public void Flash()
+    /// <param name="playSound">
+    /// 수정 (2026-10-28) — 소리도 같이 낼지. 다른 소리가 이 순간을 대신 맡을 때만 false로 부른다
+    /// (예: 3번째 오답은 '그것' 경고음만 낸다 — 둘이 겹치면 경고가 묻힌다).
+    /// </param>
+    public void Flash(bool playSound = true)
     {
         // 이미 번쩍이는 중이면 무시하지 않고 <b>다시 시작</b>한다.
         // 무시하면 두 번째 오답에서 아무 반응이 없어 '먹통'으로 느껴진다.
         if (running != null) StopCoroutine(running);
         running = StartCoroutine(FlashRoutine());
+
+        // 추가 생성 (2026-10-28) — 소리도 그림과 같은 규칙으로 처음부터 다시 낸다(PlayOneShot처럼 겹쳐 쌓지 않는다)
+        if (playSound && scareSound != null) scareSound.Play();
     }
 
     private IEnumerator FlashRoutine()

@@ -286,7 +286,9 @@ public class GameManager : MonoBehaviour
 
             // 진행도만 조용히 0이 되면 틀린 게 아프지 않다. 벌은 이미 줬으니
             // 더 뺏는 대신 놀라게 해서 '틀렸다'를 감각으로 남긴다.
-            if (wrongAnswerFlash != null) wrongAnswerFlash.Flash();
+            // 수정 (2026-10-28) — 기준에 닿은 오답(다음 칸에 '그것')은 깜놀 소리를 빼고 아래 경고음만 낸다.
+            // 둘이 동시에 나면 "이번엔 그냥 오답이 아니다"가 묻힌다. 그림(번쩍임)은 그대로 둔다.
+            if (wrongAnswerFlash != null) wrongAnswerFlash.Flash(playSound: !StalkerDue);
 
             // 기준에 닿았으면 사방 이웃에 '그것'을 심는다 — 어느 문으로 나가든 다음 칸에 있다.
             if (StalkerDue)

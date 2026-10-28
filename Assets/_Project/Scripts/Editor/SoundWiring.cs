@@ -7,7 +7,7 @@ using UnityEngine;
 /// <summary>
 /// 소리 파일을 씬에 연결하는 도구 — <c>Tools ▸ 소리 연결 (Sound Wiring)</c>. 추가 생성 (2026-10-28).
 ///
-/// 손으로 하면 오브젝트 넷을 돌며 AudioSource를 붙이고, 클립 12개를 칸마다 끌어다 놓고,
+/// 손으로 하면 오브젝트 다섯 개를 돌며 AudioSource를 붙이고, 클립 13개를 칸마다 끌어다 놓고,
 /// 루프 · 2D/3D · 자동 재생을 하나하나 맞춰야 한다. 하나라도 빠지면 조용히 무음이 되는 종류라
 /// (예: 배경음 Play On Awake를 안 켜면 아무 오류 없이 안 들린다) 도구로 한 번에 맞춘다.
 ///
@@ -16,6 +16,7 @@ using UnityEngine;
 ///               칸이 아니라 씬 루트에 두는 이유: 칸마다 두면 재활용으로 칸이 옮겨질 때 소리 위치가 튀어 들킨다.
 ///               긴 파일이라 가져오기 설정을 Streaming으로 바꾼다(통째로 메모리에 풀지 않게).
 ///  • 경고음   → GameManager의 AudioSource (2D) → <c>stalkerWarningSound</c> 칸에 연결
+///  • 깜놀 소리 → ScareFlash의 AudioSource (2D) → <c>scareSound</c> 칸에 연결 (오답 · 잡힘 공용)
 ///  • 발소리 · 숨소리 → 플레이어의 <see cref="PlayerAudio"/> (AudioSource 두 개, 2D)
 ///  • 쫓아오는 소리 → 추격자의 <see cref="StalkerAudio"/> (AudioSource 하나, 3D)
 ///
@@ -43,6 +44,7 @@ internal static class SoundWiring
 
         WireBgm(report);
         WireWarning(report);
+        WireScare(report);
         WirePlayer(report);
         WireStalker(report);
 
@@ -116,6 +118,36 @@ internal static class SoundWiring
         field.objectReferenceValue = source;
         so.ApplyModifiedProperties();
         report.Add($"경고음 → {gm.name} (볼륨 {source.volume:F2})");
+    }
+
+    // ── 깜놀 소리 (오답 · 잡힘) ─────────────────────────────
+
+    // 추가 생성 (2026-10-28) — 번쩍임(ScareFlash)과 같은 오브젝트에 붙인다. 번쩍임이 소리를 직접 내므로
+    // 오답·잡힘 두 곳에 따로 연결할 필요가 없다(ScareFlash 주석 참고).
+    private static void WireScare(List<string> report)
+    {
+        var flash = Object.FindAnyObjectByType<ScareFlash>(FindObjectsInactive.Include);
+        if (flash == null) { report.Add("⚠ 깜놀 소리 — 씬에 ScareFlash가 없어 건너뜀"); return; }
+
+        var clip = FindClip("SFX_Scare", report);
+        if (clip == null) return;
+
+        var so = new SerializedObject(flash);
+        var field = so.FindProperty("scareSound");
+        var source = field.objectReferenceValue as AudioSource;
+        bool added = false;
+        if (source == null) { source = Undo.AddComponent<AudioSource>(flash.gameObject); added = true; }
+        else Undo.RecordObject(source, "소리 연결");
+
+        source.clip = clip;
+        source.loop = false;
+        source.playOnAwake = false;
+        source.spatialBlend = 0f;
+        if (added) source.volume = 1f;
+
+        field.objectReferenceValue = source;
+        so.ApplyModifiedProperties();
+        report.Add($"깜놀 소리 → {flash.name} (볼륨 {source.volume:F2}, 오답 · 잡힘 공용)");
     }
 
     // ── 플레이어: 발소리 · 탈진 숨소리 ──────────────────────
