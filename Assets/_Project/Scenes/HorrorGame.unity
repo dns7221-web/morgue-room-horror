@@ -1552,6 +1552,56 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HandAnimator
   controller: {fileID: 0}
+--- !u!1 &949997045
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 949997047}
+  - component: {fileID: 949997046}
+  m_Layer: 0
+  m_Name: DoorAudio
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &949997046
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 949997045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f945cc25caa42608568fdecc1ab9ff3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DoorAudio
+  openSound: {fileID: 8300000, guid: 491ab0a1c7b14016b846eb534bcb8440, type: 3}
+  openVolume: 0.7
+  shutSound: {fileID: 8300000, guid: 1eeeae0c9c524978889e3f0bc26cfa04, type: 3}
+  shutVolume: 1
+  pairWindow: 0.1
+  pairDistance: 2.5
+--- !u!4 &949997047
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 949997045}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &985392185
 GameObject:
   m_ObjectHideFlags: 0
@@ -1587,6 +1637,7 @@ MonoBehaviour:
   cellPrefab: {fileID: 2912313883142370150, guid: f2e7aa9fdfbb52945b1208b8f423a229, type: 3}
   gridSize: 3
   coverageAudit: {fileID: 0}
+  slamDoorBehind: 1
 --- !u!156049354 &985392187
 Grid:
   m_ObjectHideFlags: 0
@@ -3093,3 +3144,4 @@ SceneRoots:
   - {fileID: 985392188}
   - {fileID: 370711035}
   - {fileID: 646715590}
+  - {fileID: 949997047}
